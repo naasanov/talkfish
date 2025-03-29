@@ -8,18 +8,33 @@ import json
 current_dir = os.path.dirname(os.path.abspath(__file__))
 # Get the parent directory (backend/)
 parent_dir = os.path.dirname(current_dir)
+env_path = os.path.join(parent_dir, '.env')
+
+print(f"Looking for .env file at: {env_path}")
+print(f"Does .env file exist? {os.path.exists(env_path)}")
+
 # Load .env from the parent directory
-load_dotenv(os.path.join(parent_dir, '.env'))
+load_dotenv(env_path)
 
 # Configure the Gemini API with your API key
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+print(f"Loaded API key: {'Found (not showing for security)' if GEMINI_API_KEY else 'Not found'}")
+
 if not GEMINI_API_KEY:
     raise ValueError("No Gemini API key found. Please set GEMINI_API_KEY in your environment variables.")
 
-genai.configure(api_key=GEMINI_API_KEY)
+try:
+    genai.configure(api_key=GEMINI_API_KEY)
+    print("Successfully configured Gemini API")
+except Exception as e:
+    print(f"Error configuring Gemini API: {str(e)}")
 
 # Initialize the model
-model = genai.GenerativeModel('gemini-pro')
+try:
+    model = genai.GenerativeModel('gemini-1.5-flash')
+    print("Successfully initialized Gemini model")
+except Exception as e:
+    print(f"Error initializing Gemini model: {str(e)}")
 
 # System prompt for interview feedback
 SYSTEM_PROMPT = """
@@ -73,10 +88,19 @@ def analyze_transcript(transcript, interview_type='behavioral', context=None, qu
     - context: Optional full conversation context including interviewer's question
     - question_type: Optional detected question category
     """
+    print("\nIn analyze_transcript function")
+    print(f"Transcript length: {len(transcript)} chars")
+    if context:
+        print(f"Context length: {len(context)} chars")
+    if question_type:
+        print(f"Question type: {question_type}")
+    
     try:
         # Extract basic statistics
         word_count = len(transcript.split())
         sentence_count = len([s for s in transcript.split('.') if s.strip()])
+        
+        print(f"Analyzing transcript with {word_count} words, {sentence_count} sentences")
         
         # Prepare prompt for Gemini
         user_prompt = f"""
@@ -92,45 +116,84 @@ def analyze_transcript(transcript, interview_type='behavioral', context=None, qu
         
         user_prompt += "Please analyze this interview response and provide detailed feedback following the guidelines."
         
+        # Create combined prompt with instructions and user prompt
+        combined_prompt = f"""
+        {SYSTEM_PROMPT}
+        
+        Now analyze this response:
+        
+        {user_prompt}
+        """
+        
+        print("Attempting to call Gemini API...")
+        
         # Get response from Gemini
-        response = model.generate_content(
-            [
-                {"role": "system", "parts": [SYSTEM_PROMPT]},
-                {"role": "user", "parts": [user_prompt]}
-            ],
-            generation_config={
-                "temperature": 0.2,
-                "top_p": 0.95,
-                "response_mime_type": "application/json"
-            }
-        )
+        try:
+            response = model.generate_content(
+                combined_prompt,
+                generation_config={
+                    "temperature": 0.2,
+                    "top_p": 0.95
+                }
+            )
+            print("Successfully received response from Gemini API")
+            
+        except Exception as api_error:
+            print(f"Error calling Gemini API: {str(api_error)}")
+            raise
         
         # Extract and parse the JSON response
         try:
             # Some versions of the API return the content differently
             if hasattr(response, 'text'):
-                feedback_json = json.loads(response.text)
+                print("Response has 'text' attribute")
+                raw_text = response.text
             else:
-                feedback_json = json.loads(response.parts[0].text)
+                print("Response has 'parts' attribute")
+                raw_text = response.parts[0].text
             
-            # Add transcript metadata
-            feedback_json['details']['transcript_stats'] = {
-                'word_count': word_count,
-                'sentence_count': sentence_count
-            }
+            print(f"Raw response text: {raw_text}")
             
-            # Add question type if detected
-            if question_type and 'question_type' not in feedback_json['details']:
-                feedback_json['details']['question_type'] = question_type
+            # Clean the response text
+            cleaned_text = raw_text.strip()
+            if cleaned_text.startswith("```json"):
+                cleaned_text = cleaned_text[7:]  # Remove ```json
+            if cleaned_text.startswith("```"):
+                cleaned_text = cleaned_text[3:]  # Remove ```
+            if cleaned_text.endswith("```"):
+                cleaned_text = cleaned_text[:-3]  # Remove trailing ```
+            cleaned_text = cleaned_text.strip()
             
-            return feedback_json
+            print(f"Cleaned text: {cleaned_text}")
+            
+            try:
+                feedback_json = json.loads(cleaned_text)
+                print("Successfully parsed JSON response")
+                
+                # Add transcript metadata
+                feedback_json['details']['transcript_stats'] = {
+                    'word_count': word_count,
+                    'sentence_count': sentence_count
+                }
+                
+                # Add question type if detected
+                if question_type and 'question_type' not in feedback_json['details']:
+                    feedback_json['details']['question_type'] = question_type
+                
+                print("Feedback generated:")
+                print(feedback_json)
+                
+                return feedback_json
+            except json.JSONDecodeError as json_error:
+                print(f"JSON parse error: {str(json_error)}")
+                raise
             
         except json.JSONDecodeError as e:
             # If JSON parsing fails, create a fallback response
             print(f"Failed to parse Gemini response as JSON: {e}")
-            print(f"Raw response: {response.text if hasattr(response, 'text') else response.parts[0].text}")
+            print(f"Raw response: {raw_text}")
             
-            return {
+            fallback = {
                 'message': "I analyzed your response but encountered an error formatting the detailed feedback.",
                 'type': 'neutral',
                 'details': {
@@ -143,11 +206,23 @@ def analyze_transcript(transcript, interview_type='behavioral', context=None, qu
                 }
             }
             
+            print("Using fallback response due to JSON parsing error")
+            print(fallback)
+            
+            return fallback
+                
     except Exception as e:
-        print(f"Error during Gemini API call: {str(e)}")
+        print(f"Error during transcript analysis: {str(e)}")
+        print(f"Error type: {type(e).__name__}")
+        import traceback
+        print(f"Full traceback: {traceback.format_exc()}")
         
         # Fallback analysis when API fails
-        return fallback_analysis(transcript, interview_type, question_type)
+        fallback = fallback_analysis(transcript, interview_type, question_type)
+        print("Using fallback response due to general error")
+        print(fallback)
+        
+        return fallback
 
 def fallback_analysis(transcript, interview_type, question_type=None):
     """

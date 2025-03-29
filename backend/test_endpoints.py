@@ -3,6 +3,7 @@ import os
 from scipy.io import wavfile
 import numpy as np
 import time
+import json
 
 def create_test_audio():
     """Create a simple test WAV file with a sine wave"""
@@ -71,6 +72,17 @@ def test_endpoints():
     os.remove(audio_file)
     print("Test audio file removed")
 
+def test_simple_text():
+    """Test the analysis with a simple text input"""
+    from app.nlp_analysis import analyze_transcript
+    
+    print("\nTesting direct analysis with sample text...")
+    test_text = "In my previous role, I had to deal with a difficult customer who was unhappy with our service. I listened to their concerns, acknowledged their frustration, and worked with our team to find a solution. We ended up not only resolving their immediate issue but also implementing a new process to prevent similar problems. The customer became one of our strongest advocates."
+    
+    result = analyze_transcript(test_text, interview_type='behavioral')
+    print("\nAnalysis result:")
+    print(json.dumps(result, indent=2))
+
 def test_with_file(audio_file_path):
     """Test the endpoints with an existing audio file"""
     base_url = 'http://localhost:5001'
@@ -100,9 +112,13 @@ def test_with_file(audio_file_path):
 
 if __name__ == '__main__':
     import sys
+    
+    # Always run the simple text test first
+    test_simple_text()
+    
+    # Then test with audio file if provided
     if len(sys.argv) > 1:
-        # Use provided audio file
         test_with_file(sys.argv[1])
     else:
-        print("Please provide the path to your audio file:")
-        print("python3 test_endpoints.py path/to/your/audio.wav") 
+        print("\nNo audio file provided. Only ran text analysis test.")
+        print("To test with audio, run: python3 test_endpoints.py path/to/your/audio.wav") 
