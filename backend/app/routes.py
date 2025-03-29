@@ -2,7 +2,6 @@ from flask import Blueprint, request, jsonify
 from werkzeug.utils import secure_filename
 import os
 from .audio_processing import process_audio, transcribe_audio
-from .nlp_analysis import analyze_transcript
 
 # Create blueprint
 bp = Blueprint('main', __name__)
