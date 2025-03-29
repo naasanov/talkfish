@@ -3,14 +3,16 @@
   "name": "Talkfish interview feedback",
   "version": "1.0",
   "description": "realtime interview feedback",
-  "permissions": ["storage", "activeTab","microphone"],
+  "permissions": [
+    "storage",
+    "activeTab",
+    "microphone"
+  ],
   "background": {
-    "service_worker": "background.js"
+    "service_worker": "src/background.js"
   },
-  
-  
   "action": {
-    "default_popup": "popup.html",
+    "default_popup": "src/popup/popup.html",
     "default_icon": {
       "16": "icon.png",
       "48": "icon.png",
@@ -19,14 +21,22 @@
   },
   "content_scripts": [
     {
-      "matches": ["<all_urls>"],
-      "js": ["content.js"]
+      "matches": [
+        "<all_urls>"
+      ],
+      "js": [
+        "src/content.js"
+      ]
     }
   ],
   "web_accessible_resources": [
     {
-      "resources": ["scripts/*.js"],
-      "matches": ["<all_urls>"]
+      "resources": [
+        "src/scripts/*.js"
+      ],
+      "matches": [
+        "<all_urls>"
+      ]
     }
   ]
 }
