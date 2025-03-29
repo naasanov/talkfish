@@ -1,9 +1,14 @@
 {
   "manifest_version": 3,
-  "name": "My Chrome Extension",
+  "name": "Talkfish interview feedback",
   "version": "1.0",
-  "description": "A simple Chrome extension.",
-  "permissions": ["storage"],
+  "description": "realtime interview feedback",
+  "permissions": ["storage", "activeTab","microphone"],
+  "background": {
+    "service_worker": "background.js"
+  },
+  
+  
   "action": {
     "default_popup": "popup.html",
     "default_icon": {
@@ -11,5 +16,17 @@
       "48": "icon.png",
       "128": "icon.png"
     }
-  }
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"]
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["scripts/*.js"],
+      "matches": ["<all_urls>"]
+    }
+  ]
 }
