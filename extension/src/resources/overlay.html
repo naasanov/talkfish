@@ -21,8 +21,10 @@
       background-color: rgba(0, 0, 0, 0.5);
       z-index: 9999;
       display: flex;
-      justify-content: center;
+      flex-direction: column;
+      justify-content: flex-start;
       align-items: center;
+      padding: 0;
     }
 
     #toggle {
@@ -69,12 +71,28 @@
       animation: pulse 2s infinite;
       background-color: #ff4444;
     }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      width: 100%;
+    }
+
+    #title {
+      font-size: 24px;
+      font-weight: bold;
+      color: white;
+    }
   </style>
 </head>
 
 <body>
   <div class="overlay">
-    <button id="toggle">▶</button>
+    <div class="header">
+      <button id="toggle">▶</button>
+      <span id="title">Mock Interview</span>
+    </div>
   </div>
   <script src="overlay.js"></script>
 </body>
