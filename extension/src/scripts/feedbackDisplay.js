@@ -1,174 +1,296 @@
-function displayFeedback(feedbackData) {
-    // Create or get the feedback container
-    let feedbackElement = document.getElementById("interview-feedback-container");
-    if (!feedbackElement) {
-      feedbackElement = document.createElement("div");
-      feedbackElement.id = "interview-feedback-container";
-      feedbackElement.style.position = "fixed";
-      feedbackElement.style.top = "20px";
-      feedbackElement.style.right = "20px";
-      feedbackElement.style.width = "350px";
-      feedbackElement.style.maxHeight = "80vh";
-      feedbackElement.style.overflowY = "auto";
-      feedbackElement.style.backgroundColor = "#fff";
-      feedbackElement.style.boxShadow = "0 0 10px rgba(0,0,0,0.2)";
-      feedbackElement.style.borderRadius = "8px";
-      feedbackElement.style.padding = "15px";
-      feedbackElement.style.zIndex = "10000";
-      feedbackElement.style.fontFamily = "Arial, sans-serif";
-      document.body.appendChild(feedbackElement);
+class FeedbackDisplay {
+    constructor() {
+      this.feedbackContainer = document.getElementById('feedback-container');
+      if (!this.feedbackContainer) {
+        this.feedbackContainer = document.createElement('div');
+        this.feedbackContainer.id = 'feedback-container';
+        document.body.appendChild(this.feedbackContainer);
+      }
     }
   
-    // Determine the feedback header color based on type
-    let headerColor = "#4287f5"; // Default blue
-    if (feedbackData.type === "positive") {
-      headerColor = "#42b883"; // Green
-    } else if (feedbackData.type === "constructive") {
-      headerColor = "#f59042"; // Orange
-    } else if (feedbackData.type === "warning" || feedbackData.type === "error") {
-      headerColor = "#f54242"; // Red
-    }
-  
-    // Build the feedback HTML
-    let feedbackHtml = `
-      <div style="border-bottom: 2px solid ${headerColor}; margin-bottom: 10px;">
-        <h3 style="color: ${headerColor}; margin: 0 0 10px 0;">Interview Feedback</h3>
-      </div>
-      <p style="font-weight: bold;">${feedbackData.message}</p>
-    `;
-  
-    // Add detailed feedback if available
-    if (feedbackData.details) {
-      const details = feedbackData.details;
+    showFeedback(feedback) {
+      // Clear previous feedback
+      this.feedbackContainer.innerHTML = '';
       
-      // Add overall score if available
-      if (details.overall_score) {
-        feedbackHtml += `
-          <div style="margin: 10px 0; text-align: center;">
-            <span style="font-size: 24px; font-weight: bold; color: ${headerColor};">
-              ${details.overall_score}/10
-            </span>
-            <div style="background: #eee; height: 10px; border-radius: 5px; margin-top: 5px;">
-              <div style="background: ${headerColor}; width: ${details.overall_score * 10}%; height: 10px; border-radius: 5px;"></div>
-            </div>
-          </div>
-        `;
-      }
-  
-      // Add STAR method analysis if available
-      if (details.star_analysis) {
-        feedbackHtml += `<div style="margin-top: 15px;"><h4 style="margin: 5px 0;">STAR Method Analysis</h4>`;
+      // Create main feedback container
+      const feedbackCard = document.createElement('div');
+      feedbackCard.className = 'feedback-card';
+      
+      // Add feedback type styling
+      feedbackCard.classList.add(`feedback-${feedback.type || 'neutral'}`);
+      
+      // Create header
+      const header = document.createElement('div');
+      header.className = 'feedback-header';
+      
+      const title = document.createElement('h2');
+      title.textContent = 'Interview Feedback';
+      header.appendChild(title);
+      
+      // Create main message
+      const message = document.createElement('div');
+      message.className = 'feedback-message';
+      message.textContent = feedback.message || 'No feedback available';
+      
+      // Create details section
+      const detailsContainer = document.createElement('div');
+      detailsContainer.className = 'feedback-details';
+      
+      // Add components to the main card
+      feedbackCard.appendChild(header);
+      feedbackCard.appendChild(message);
+      
+      // Only add details if they exist
+      if (feedback.details) {
+        // Question type
+        if (feedback.details.question_type) {
+          const questionType = document.createElement('div');
+          questionType.className = 'feedback-section';
+          
+          const typeTitle = document.createElement('h3');
+          typeTitle.textContent = 'Question Type';
+          
+          const typeValue = document.createElement('p');
+          typeValue.textContent = this.capitalizeFirstLetter(feedback.details.question_type);
+          
+          questionType.appendChild(typeTitle);
+          questionType.appendChild(typeValue);
+          detailsContainer.appendChild(questionType);
+        }
         
-        const star = details.star_analysis;
-        const components = ["situation", "task", "action", "result"];
+        // STAR analysis
+        if (feedback.details.star_analysis) {
+          const starAnalysis = document.createElement('div');
+          starAnalysis.className = 'feedback-section';
+          
+          const starTitle = document.createElement('h3');
+          starTitle.textContent = 'STAR Method Analysis';
+          starAnalysis.appendChild(starTitle);
+          
+          // Create a table for STAR analysis
+          const starTable = document.createElement('table');
+          starTable.className = 'star-table';
+          
+          // Create table header
+          const tableHeader = document.createElement('tr');
+          ['Component', 'Present', 'Strength', 'Feedback'].forEach(headerText => {
+            const th = document.createElement('th');
+            th.textContent = headerText;
+            tableHeader.appendChild(th);
+          });
+          starTable.appendChild(tableHeader);
+          
+          // Add STAR components to the table
+          const starComponents = ['situation', 'task', 'action', 'result'];
+          starComponents.forEach(component => {
+            if (feedback.details.star_analysis[component]) {
+              const row = document.createElement('tr');
+              
+              // Component name
+              const componentCell = document.createElement('td');
+              componentCell.textContent = this.capitalizeFirstLetter(component);
+              row.appendChild(componentCell);
+              
+              // Present (Yes/No)
+              const presentCell = document.createElement('td');
+              const componentData = feedback.details.star_analysis[component];
+              presentCell.textContent = componentData.present ? 'Yes' : 'No';
+              row.appendChild(presentCell);
+              
+              // Strength (1-10)
+              const strengthCell = document.createElement('td');
+              strengthCell.className = 'strength-cell';
+              
+              // Create strength bar
+              if (componentData.strength) {
+                const strengthBar = document.createElement('div');
+                strengthBar.className = 'strength-bar';
+                
+                const strengthValue = document.createElement('div');
+                strengthValue.className = 'strength-value';
+                strengthValue.style.width = `${componentData.strength * 10}%`;
+                
+                // Color based on strength
+                if (componentData.strength >= 7) {
+                  strengthValue.classList.add('strength-high');
+                } else if (componentData.strength >= 4) {
+                  strengthValue.classList.add('strength-medium');
+                } else {
+                  strengthValue.classList.add('strength-low');
+                }
+                
+                const strengthText = document.createElement('span');
+                strengthText.textContent = componentData.strength;
+                
+                strengthBar.appendChild(strengthValue);
+                strengthCell.appendChild(strengthBar);
+                strengthCell.appendChild(strengthText);
+              } else {
+                strengthCell.textContent = 'N/A';
+              }
+              row.appendChild(strengthCell);
+              
+              // Feedback
+              const feedbackCell = document.createElement('td');
+              feedbackCell.textContent = componentData.feedback || 'No specific feedback';
+              row.appendChild(feedbackCell);
+              
+              starTable.appendChild(row);
+            }
+          });
+          
+          starAnalysis.appendChild(starTable);
+          detailsContainer.appendChild(starAnalysis);
+        }
         
-        components.forEach(component => {
-          if (star[component]) {
-            const present = star[component].present;
-            const strength = star[component].strength || 0;
+        // Language quality
+        if (feedback.details.language_quality) {
+          const languageQuality = document.createElement('div');
+          languageQuality.className = 'feedback-section';
+          
+          const languageTitle = document.createElement('h3');
+          languageTitle.textContent = 'Language Quality';
+          languageQuality.appendChild(languageTitle);
+          
+          const qualityGrid = document.createElement('div');
+          qualityGrid.className = 'quality-grid';
+          
+          // Clarity metric
+          if (feedback.details.language_quality.clarity) {
+            const clarityContainer = document.createElement('div');
+            clarityContainer.className = 'quality-metric';
             
-            feedbackHtml += `
-              <div style="margin: 8px 0;">
-                <div style="display: flex; justify-content: space-between; align-items: center;">
-                  <span style="text-transform: capitalize; font-weight: bold;">${component}:</span>
-                  <span>${present ? "✓" : "✗"}</span>
-                </div>
-                ${strength > 0 ? `
-                  <div style="background: #eee; height: 6px; border-radius: 3px; margin-top: 5px;">
-                    <div style="background: ${headerColor}; width: ${strength * 10}%; height: 6px; border-radius: 3px;"></div>
-                  </div>
-                ` : ""}
-                ${star[component].feedback ? `<p style="margin: 5px 0; font-size: 12px;">${star[component].feedback}</p>` : ""}
-              </div>
-            `;
+            const clarityLabel = document.createElement('p');
+            clarityLabel.textContent = 'Clarity: ';
+            clarityLabel.className = 'metric-label';
+            
+            const clarityValue = document.createElement('span');
+            clarityValue.textContent = `${feedback.details.language_quality.clarity}/10`;
+            clarityLabel.appendChild(clarityValue);
+            
+            clarityContainer.appendChild(clarityLabel);
+            qualityGrid.appendChild(clarityContainer);
           }
-        });
-        
-        feedbackHtml += `</div>`;
-      }
-  
-      // Add language quality feedback if available
-      if (details.language_quality) {
-        const language = details.language_quality;
-        
-        feedbackHtml += `<div style="margin-top: 15px;"><h4 style="margin: 5px 0;">Language Quality</h4>`;
-        
-        if (language.clarity) {
-          feedbackHtml += `
-            <div style="margin: 5px 0;">
-              <div style="display: flex; justify-content: space-between;">
-                <span>Clarity:</span>
-                <span>${language.clarity}/10</span>
-              </div>
-              <div style="background: #eee; height: 6px; border-radius: 3px; margin-top: 5px;">
-                <div style="background: ${headerColor}; width: ${language.clarity * 10}%; height: 6px; border-radius: 3px;"></div>
-              </div>
-            </div>
-          `;
+          
+          // Conciseness metric
+          if (feedback.details.language_quality.conciseness) {
+            const concisenessContainer = document.createElement('div');
+            concisenessContainer.className = 'quality-metric';
+            
+            const concisenessLabel = document.createElement('p');
+            concisenessLabel.textContent = 'Conciseness: ';
+            concisenessLabel.className = 'metric-label';
+            
+            const concisenessValue = document.createElement('span');
+            concisenessValue.textContent = `${feedback.details.language_quality.conciseness}/10`;
+            concisenessLabel.appendChild(concisenessValue);
+            
+            concisenessContainer.appendChild(concisenessLabel);
+            qualityGrid.appendChild(concisenessContainer);
+          }
+          
+          // Filler words
+          if (feedback.details.language_quality.filler_words) {
+            const fillerContainer = document.createElement('div');
+            fillerContainer.className = 'quality-metric filler-words';
+            
+            const fillerLabel = document.createElement('p');
+            fillerLabel.textContent = `Filler Words: ${feedback.details.language_quality.filler_words.frequency}`;
+            fillerLabel.className = 'metric-label';
+            
+            fillerContainer.appendChild(fillerLabel);
+            
+            // Add examples if available
+            if (feedback.details.language_quality.filler_words.examples && 
+                feedback.details.language_quality.filler_words.examples.length > 0) {
+              const examplesList = document.createElement('ul');
+              feedback.details.language_quality.filler_words.examples.forEach(example => {
+                const item = document.createElement('li');
+                item.textContent = example;
+                examplesList.appendChild(item);
+              });
+              fillerContainer.appendChild(examplesList);
+            }
+            
+            qualityGrid.appendChild(fillerContainer);
+          }
+          
+          languageQuality.appendChild(qualityGrid);
+          detailsContainer.appendChild(languageQuality);
         }
-  
-        if (language.conciseness) {
-          feedbackHtml += `
-            <div style="margin: 5px 0;">
-              <div style="display: flex; justify-content: space-between;">
-                <span>Conciseness:</span>
-                <span>${language.conciseness}/10</span>
-              </div>
-              <div style="background: #eee; height: 6px; border-radius: 3px; margin-top: 5px;">
-                <div style="background: ${headerColor}; width: ${language.conciseness * 10}%; height: 6px; border-radius: 3px;"></div>
-              </div>
-            </div>
-          `;
+        
+        // Improvement suggestions
+        if (feedback.details.improvement_suggestions && 
+            feedback.details.improvement_suggestions.length > 0) {
+          const suggestionsSection = document.createElement('div');
+          suggestionsSection.className = 'feedback-section';
+          
+          const suggestionsTitle = document.createElement('h3');
+          suggestionsTitle.textContent = 'Suggestions for Improvement';
+          suggestionsSection.appendChild(suggestionsTitle);
+          
+          const suggestionsList = document.createElement('ul');
+          suggestionsList.className = 'suggestions-list';
+          
+          feedback.details.improvement_suggestions.forEach(suggestion => {
+            const item = document.createElement('li');
+            item.textContent = suggestion;
+            suggestionsList.appendChild(item);
+          });
+          
+          suggestionsSection.appendChild(suggestionsList);
+          detailsContainer.appendChild(suggestionsSection);
         }
-  
-        if (language.filler_words && language.filler_words.frequency) {
-          feedbackHtml += `
-            <div style="margin: 5px 0;">
-              <div><span>Filler Words: </span><span>${language.filler_words.frequency}</span></div>
-              ${language.filler_words.examples && language.filler_words.examples.length > 0 ? 
-                `<div style="font-size: 12px; color: #666; margin-top: 3px;">Examples: ${language.filler_words.examples.join(", ")}</div>` : ""}
-            </div>
-          `;
+        
+        // Overall score
+        if (feedback.details.overall_score) {
+          const scoreSection = document.createElement('div');
+          scoreSection.className = 'feedback-section overall-score';
+          
+          const scoreTitle = document.createElement('h3');
+          scoreTitle.textContent = 'Overall Score';
+          
+          const scoreDisplay = document.createElement('div');
+          scoreDisplay.className = 'score-display';
+          
+          const score = feedback.details.overall_score;
+          scoreDisplay.textContent = score;
+          
+          // Add color class based on score
+          if (score >= 8) {
+            scoreDisplay.classList.add('score-high');
+          } else if (score >= 5) {
+            scoreDisplay.classList.add('score-medium');
+          } else {
+            scoreDisplay.classList.add('score-low');
+          }
+          
+          scoreSection.appendChild(scoreTitle);
+          scoreSection.appendChild(scoreDisplay);
+          detailsContainer.appendChild(scoreSection);
         }
-  
-        feedbackHtml += `</div>`;
+        
+        // Add all details to the main card
+        feedbackCard.appendChild(detailsContainer);
       }
-  
-      // Add improvement suggestions if available
-      if (details.improvement_suggestions && details.improvement_suggestions.length > 0) {
-        feedbackHtml += `
-          <div style="margin-top: 15px;">
-            <h4 style="margin: 5px 0;">Suggestions for Improvement</h4>
-            <ul style="margin: 5px 0; padding-left: 20px;">
-              ${details.improvement_suggestions.map(suggestion => `<li>${suggestion}</li>`).join("")}
-            </ul>
-          </div>
-        `;
-      }
-  
-      // Add transcript stats if available
-      if (details.transcript_stats) {
-        feedbackHtml += `
-          <div style="margin-top: 15px; font-size: 12px; color: #666;">
-            <div>Word count: ${details.transcript_stats.word_count || "N/A"}</div>
-            ${details.transcript_stats.sentence_count ? `<div>Sentence count: ${details.transcript_stats.sentence_count}</div>` : ""}
-          </div>
-        `;
+      
+      // Add feedback card to container
+      this.feedbackContainer.appendChild(feedbackCard);
+      
+      // Make the feedback visible
+      this.feedbackContainer.style.display = 'block';
+    }
+    
+    capitalizeFirstLetter(string) {
+      return string.charAt(0).toUpperCase() + string.slice(1);
+    }
+    
+    hideFeedback() {
+      if (this.feedbackContainer) {
+        this.feedbackContainer.style.display = 'none';
       }
     }
-  
-    // Add close button
-    feedbackHtml += `
-      <div style="margin-top: 15px; text-align: right;">
-        <button id="close-feedback" style="padding: 5px 10px; background: #eee; border: none; border-radius: 5px; cursor: pointer;">Close</button>
-      </div>
-    `;
-  
-    // Set the HTML content
-    feedbackElement.innerHTML = feedbackHtml;
-  
-    // Add event listener to close button
-    document.getElementById("close-feedback").addEventListener("click", () => {
-      feedbackElement.remove();
-    });
   }
+  
+  // Export for use in other modules
+  export default FeedbackDisplay;

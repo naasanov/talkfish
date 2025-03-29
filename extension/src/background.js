@@ -1,3 +1,4 @@
+// background.js
 chrome.runtime.onInstalled.addListener(() => {
   console.log("Mock Interview Feedback Extension Installed");
 });
