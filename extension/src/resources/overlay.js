@@ -12,10 +12,12 @@ document.getElementById("toggle").addEventListener("click", () => {
   isRecording = !isRecording;
   const button = document.getElementById("toggle");
   if (isRecording) {
-    button.textContent = "Stop Mock Interview";
+    button.classList.add("recording");
+    button.textContent = "⏸";
     startFunc();
   } else {
-    button.textContent = "Start Mock Interview";
+    button.classList.remove("recording");
+    button.textContent = "▶";
     stopFunc();
   }
 });

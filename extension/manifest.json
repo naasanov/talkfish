@@ -6,13 +6,17 @@
   "permissions": [
     "storage",
     "activeTab",
-    "microphone"
+    "tabCapture",
+    "scripting"
+  ],
+  "host_permissions": [
+    "<all_urls>"
   ],
   "background": {
-    "service_worker": "src/background.js"
+    "service_worker": "src/background.js",
+    "type": "module"
   },
   "action": {
-    "default_popup": "src/popup/popup.html",
     "default_icon": {
       "16": "icon.png",
       "48": "icon.png",
@@ -32,7 +36,8 @@
   "web_accessible_resources": [
     {
       "resources": [
-        "src/scripts/*.js"
+        "src/scripts/*.js",
+        "src/resources/overlay.html"
       ],
       "matches": [
         "<all_urls>"
