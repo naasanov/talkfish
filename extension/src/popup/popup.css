@@ -1,12 +1,210 @@
 body {
     font-family: Inter, sans-serif;
-    width: 200px;
-    padding: 10px;
+    width: 400px;
+    padding: 15px;
+  }
+  
+  h1 {
+    text-align: center;
+    margin-bottom: 15px;
+    font-size: 18px;
+  }
+  
+  .controls {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 20px;
   }
   
   button {
-    width: 100%;
+    flex: 1;
     padding: 10px;
-    margin-top: 5px;
+    border-radius: 5px;
+    border: 1px solid #ccc;
+    background-color: #f0f0f0;
+    cursor: pointer;
+    font-weight: bold;
   }
   
+  button:hover {
+    background-color: #e0e0e0;
+  }
+  
+  button:disabled {
+    background-color: #ccc;
+    cursor: not-allowed;
+  }
+  
+  #feedback-container {
+    margin-top: 15px;
+  }
+  
+  /* Feedback card styling */
+  .feedback-card {
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    overflow: hidden;
+    margin-bottom: 15px;
+  }
+  
+  .feedback-header {
+    padding: 10px 15px;
+    border-bottom: 1px solid #eee;
+  }
+  
+  .feedback-header h2 {
+    margin: 0;
+    font-size: 16px;
+  }
+  
+  .feedback-message {
+    padding: 15px;
+    font-size: 14px;
+    line-height: 1.5;
+  }
+  
+  .feedback-details {
+    padding: 0 15px 15px;
+  }
+  
+  .feedback-section {
+    margin-bottom: 15px;
+  }
+  
+  .feedback-section h3 {
+    font-size: 14px;
+    margin: 10px 0;
+    padding-bottom: 5px;
+    border-bottom: 1px solid #eee;
+  }
+  
+  /* STAR table styles */
+  .star-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+  }
+  
+  .star-table th, .star-table td {
+    border: 1px solid #ddd;
+    padding: 8px;
+    text-align: left;
+  }
+  
+  .star-table th {
+    background-color: #f5f5f5;
+  }
+  
+  /* Strength bar styles */
+  .strength-bar {
+    width: 100%;
+    height: 8px;
+    background-color: #eee;
+    border-radius: 4px;
+    margin-bottom: 3px;
+  }
+  
+  .strength-value {
+    height: 100%;
+    border-radius: 4px;
+  }
+  
+  .strength-high {
+    background-color: #4CAF50;
+  }
+  
+  .strength-medium {
+    background-color: #FFC107;
+  }
+  
+  .strength-low {
+    background-color: #F44336;
+  }
+  
+  .strength-cell {
+    position: relative;
+  }
+  
+  /* Quality metrics */
+  .quality-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+  
+  .quality-metric {
+    background-color: #f9f9f9;
+    padding: 10px;
+    border-radius: 5px;
+  }
+  
+  .filler-words {
+    grid-column: span 2;
+  }
+  
+  .metric-label {
+    margin: 0;
+    font-weight: bold;
+  }
+  
+  .filler-words ul {
+    margin: 5px 0 0 20px;
+    padding: 0;
+    font-size: 12px;
+  }
+  
+  /* Overall score */
+  .overall-score {
+    text-align: center;
+  }
+  
+  .score-display {
+    font-size: 24px;
+    font-weight: bold;
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto;
+  }
+  
+  .score-high {
+    background-color: #4CAF50;
+    color: white;
+  }
+  
+  .score-medium {
+    background-color: #FFC107;
+    color: black;
+  }
+  
+  .score-low {
+    background-color: #F44336;
+    color: white;
+  }
+  
+  /* Feedback type styles */
+  .feedback-positive {
+    border-left: 5px solid #4CAF50;
+  }
+  
+  .feedback-neutral {
+    border-left: 5px solid #FFC107;
+  }
+  
+  .feedback-negative {
+    border-left: 5px solid #F44336;
+  }
+  
+  /* Suggestions list */
+  .suggestions-list {
+    margin: 0;
+    padding-left: 20px;
+  }
+  
+  .suggestions-list li {
+    margin-bottom: 5px;
+    font-size: 13px;
+  }
