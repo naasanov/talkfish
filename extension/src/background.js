@@ -10,5 +10,6 @@ chrome.runtime.onInstalled.addListener(() => {
       // Handle stopping recording
       sendResponse({ status: "Recording stopped" });
     }
+
   });
   
