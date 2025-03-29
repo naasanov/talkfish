@@ -4,7 +4,12 @@ from dotenv import load_dotenv
 import json
 
 # Load environment variables from .env file
-load_dotenv()
+# Get the current file's directory
+current_dir = os.path.dirname(os.path.abspath(__file__))
+# Get the parent directory (backend/)
+parent_dir = os.path.dirname(current_dir)
+# Load .env from the parent directory
+load_dotenv(os.path.join(parent_dir, '.env'))
 
 # Configure the Gemini API with your API key
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
