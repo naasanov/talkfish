@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TalkFish - SSE Transcription Demo</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        h1 {
+            color: #2c3e50;
+        }
+        
+        .container {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        
+        .controls > div {
+            flex: 1;
+        }
+        
+        .panel {
+            background: #f5f7fa;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        
+        button {
+            background-color: #3498db;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            margin: 5px 0;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            width: 100%;
+        }
+        
+        button:hover {
+            background-color: #2980b9;
+        }
+        
+        button:disabled {
+            background-color: #95a5a6;
+            cursor: not-allowed;
+        }
+        
+        .stream-type {
+            margin-bottom: 15px;
+        }
+        
+        .radio-group {
+            display: flex;
+            gap: 15px;
+            margin-top: 5px;
+        }
+        
+        .radio-group label {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            cursor: pointer;
+        }
+        
+        .status {
+            margin-top: 15px;
+            padding: 10px;
+            background: #ecf0f1;
+            border-radius: 4px;
+        }
+        
+        #transcript {
+            background: white;
+            padding: 15px;
+            border-radius: 4px;
+            min-height: 200px;
+            max-height: 400px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            margin-bottom: 20px;
+        }
+        
+        #feedback {
+            background: white;
+            padding: 15px;
+            border-radius: 4px;
+        }
+        
+        .log-container {
+            font-family: monospace;
+            background: #2c3e50;
+            color: #ecf0f1;
+            padding: 15px;
+            border-radius: 4px;
+            height: 150px;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>TalkFish - SSE Transcription Demo</h1>
+        <p>Real-time transcription using Server-Sent Events</p>
+    </header>
+    
+    <div class="container">
+        <div class="controls">
+            <div class="panel">
+                <h2>Transcription Controls</h2>
+                
+                <div class="stream-type">
+                    <p>Select transcription type:</p>
+                    <div class="radio-group">
+                        <label>
+                            <input type="radio" name="stream-type" value="mic" checked>
+                            Microphone
+                        </label>
+                        <label>
+                            <input type="radio" name="stream-type" value="tab">
+                            Tab Audio
+                        </label>
+                    </div>
+                </div>
+                
+                <button id="start-btn">Start Transcription</button>
+                <button id="stop-btn" disabled>Stop Transcription</button>
+                
+                <div class="status" id="status">Ready to start transcription</div>
+            </div>
+            
+            <div class="panel">
+                <h2>Session Info</h2>
+                <p><strong>Session ID:</strong> <span id="session-id">None</span></p>
+                <p><strong>Stream Type:</strong> <span id="session-type">None</span></p>
+                <p><strong>Status:</strong> <span id="session-status">Inactive</span></p>
+                <p><strong>Last Update:</strong> <span id="last-update">None</span></p>
+            </div>
+        </div>
+        
+        <div class="panel">
+            <h2>Transcript</h2>
+            <div id="transcript">Transcript will appear here...</div>
+            
+            <h2>Feedback</h2>
+            <div id="feedback">Feedback will appear after stopping transcription...</div>
+        </div>
+        
+        <div class="panel">
+            <h2>Event Log</h2>
+            <div class="log-container" id="log"></div>
+        </div>
+    </div>
+    
+    <script>
+        // Configuration
+        const API_BASE_URL = 'http://localhost:5001';
+        let sessionId = null;
+        let streamType = 'mic';
+        let eventSource = null;
+        
+        // DOM elements
+        const startBtn = document.getElementById('start-btn');
+        const stopBtn = document.getElementById('stop-btn');
+        const statusEl = document.getElementById('status');
+        const sessionIdEl = document.getElementById('session-id');
+        const sessionTypeEl = document.getElementById('session-type');
+        const sessionStatusEl = document.getElementById('session-status');
+        const lastUpdateEl = document.getElementById('last-update');
+        const transcriptEl = document.getElementById('transcript');
+        const feedbackEl = document.getElementById('feedback');
+        const logEl = document.getElementById('log');
+        const streamTypeRadios = document.querySelectorAll('input[name="stream-type"]');
+        
+        // Event listeners
+        startBtn.addEventListener('click', startTranscription);
+        stopBtn.addEventListener('click', stopTranscription);
+        
+        streamTypeRadios.forEach(radio => {
+            radio.addEventListener('change', function() {
+                streamType = this.value;
+                log(`Stream type changed to: ${streamType}`);
+            });
+        });
+        
+        // Functions
+        async function startTranscription() {
+            try {
+                statusEl.textContent = 'Starting transcription...';
+                
+                // Start the transcription stream
+                const response = await fetch(`${API_BASE_URL}/start-stream`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        stream_type: streamType,
+                        interview_type: 'behavioral'
+                    })
+                });
+                
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || 'Failed to start transcription');
+                }
+                
+                const data = await response.json();
+                sessionId = data.session_id;
+                
+                // Update UI
+                sessionIdEl.textContent = sessionId;
+                sessionTypeEl.textContent = streamType;
+                sessionStatusEl.textContent = 'Active';
+                statusEl.textContent = `${streamType.charAt(0).toUpperCase() + streamType.slice(1)} transcription started`;
+                
+                startBtn.disabled = true;
+                stopBtn.disabled = false;
+                
+                log(`Transcription started with session ID: ${sessionId}`);
+                log(`Message: ${data.message}`);
+                
+                // Connect to SSE stream
+                connectEventSource();
+                
+                // For tab audio, we need to simulate sending audio data
+                if (streamType === 'tab') {
+                    simulateTabAudio();
+                }
+                
+            } catch (error) {
+                log(`Error: ${error.message}`, 'error');
+                statusEl.textContent = `Error: ${error.message}`;
+            }
+        }
+        
+        async function stopTranscription() {
+            try {
+                if (!sessionId) return;
+                
+                statusEl.textContent = 'Stopping transcription...';
+                
+                // Stop the transcription stream
+                const response = await fetch(`${API_BASE_URL}/stop-stream`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        session_id: sessionId
+                    })
+                });
+                
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || 'Failed to stop transcription');
+                }
+                
+                const data = await response.json();
+                
+                // Update UI
+                sessionStatusEl.textContent = 'Inactive';
+                statusEl.textContent = 'Transcription stopped';
+                
+                startBtn.disabled = false;
+                stopBtn.disabled = true;
+                
+                log(`Transcription stopped: ${data.message}`);
+                
+                // Close SSE connection
+                if (eventSource) {
+                    eventSource.close();
+                    eventSource = null;
+                }
+                
+            } catch (error) {
+                log(`Error: ${error.message}`, 'error');
+                statusEl.textContent = `Error: ${error.message}`;
+            }
+        }
+        
+        function connectEventSource() {
+            // Close existing connection
+            if (eventSource) {
+                eventSource.close();
+            }
+            
+            // Create new SSE connection
+            eventSource = new EventSource(`${API_BASE_URL}/stream/${sessionId}/events`);
+            
+            // Connected event
+            eventSource.addEventListener('connected', function(event) {
+                const data = JSON.parse(event.data);
+                log(`SSE Connected: ${JSON.stringify(data)}`);
+            });
+            
+            // Regular message event (transcript updates)
+            eventSource.addEventListener('message', function(event) {
+                const data = JSON.parse(event.data);
+                
+                // Update transcript
+                if (data.transcript) {
+                    transcriptEl.textContent = data.transcript;
+                }
+                
+                // Update feedback if this is the final update
+                if (data.is_final && data.feedback) {
+                    updateFeedback(data.feedback);
+                }
+                
+                // Update last update time
+                lastUpdateEl.textContent = new Date().toLocaleTimeString();
+                
+                log(`Received update: ${data.transcript ? data.transcript.length : 0} chars`);
+            });
+            
+            // Keepalive event
+            eventSource.addEventListener('keepalive', function(event) {
+                log(`Keepalive: ${event.data}`, 'info', false);
+            });
+            
+            // Closed event
+            eventSource.addEventListener('closed', function(event) {
+                const data = JSON.parse(event.data);
+                log(`SSE Closed: ${JSON.stringify(data)}`);
+                
+                // Update UI
+                sessionStatusEl.textContent = 'Inactive';
+                statusEl.textContent = 'Transcription connection closed';
+                
+                // Close connection
+                eventSource.close();
+                eventSource = null;
+            });
+            
+            // Error event
+            eventSource.onerror = function(error) {
+                log(`SSE Error: ${error.type}`, 'error');
+                
+                // If connection is closed unexpectedly, update UI
+                if (eventSource.readyState === EventSource.CLOSED) {
+                    sessionStatusEl.textContent = 'Inactive';
+                    statusEl.textContent = 'Transcription connection closed unexpectedly';
+                    
+                    // Reset buttons
+                    startBtn.disabled = false;
+                    stopBtn.disabled = true;
+                    
+                    eventSource = null;
+                }
+            };
+        }
+        
+        function updateFeedback(feedback) {
+            // Create feedback HTML
+            let feedbackHtml = `<p><strong>${feedback.message}</strong></p>`;
+            
+            // Add suggestion if available
+            if (feedback.details && feedback.details.suggestion) {
+                feedbackHtml += `<p>Suggestion: ${feedback.details.suggestion}</p>`;
+            }
+            
+            // Add STAR analysis if available
+            if (feedback.details && feedback.details.STAR) {
+                feedbackHtml += '<h3>STAR Analysis:</h3><ul>';
+                for (const [key, value] of Object.entries(feedback.details.STAR)) {
+                    feedbackHtml += `<li><strong>${key}:</strong> ${value}</li>`;
+                }
+                feedbackHtml += '</ul>';
+            }
+            
+            // Update feedback element
+            feedbackEl.innerHTML = feedbackHtml;
+        }
+        
+        function simulateTabAudio() {
+            // For demo purposes, we'll just send some dummy audio data at regular intervals
+            if (!sessionId || streamType !== 'tab') return;
+            
+            const sendAudioInterval = setInterval(async () => {
+                // Check if session is still active
+                if (!sessionId) {
+                    clearInterval(sendAudioInterval);
+                    return;
+                }
+                
+                try {
+                    // Create dummy audio data (real implementation would use actual audio samples)
+                    const dummyAudioData = Array(1000).fill(0).map(() => Math.random() * 2 - 1);
+                    
+                    // Send to server
+                    const response = await fetch(`${API_BASE_URL}/stream/${sessionId}/audio`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            audio_data: dummyAudioData
+                        })
+                    });
+                    
+                    if (!response.ok) {
+                        const errorData = await response.json();
+                        throw new Error(errorData.error || 'Failed to send audio data');
+                    }
+                    
+                    log('Sent audio data chunk', 'info', false);
+                    
+                } catch (error) {
+                    log(`Error sending audio data: ${error.message}`, 'error');
+                    clearInterval(sendAudioInterval);
+                }
+            }, 500); // Send audio data every 500ms
+            
+            // Clean up interval when stopping
+            stopBtn.addEventListener('click', () => {
+                clearInterval(sendAudioInterval);
+            }, { once: true });
+        }
+        
+        function log(message, level = 'info', showTimestamp = true) {
+            const timestamp = showTimestamp ? `[${new Date().toLocaleTimeString()}] ` : '';
+            const entry = document.createElement('div');
+            entry.textContent = timestamp + message;
+            
+            if (level === 'error') {
+                entry.style.color = '#e74c3c';
+            } else if (level === 'warning') {
+                entry.style.color = '#f39c12';
+            }
+            
+            logEl.appendChild(entry);
+            logEl.scrollTop = logEl.scrollHeight;
+        }
+    </script>
+</body>
+</html> 

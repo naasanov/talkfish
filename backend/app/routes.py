@@ -4,6 +4,13 @@ import os
 import numpy as np
 from .audio_processing import process_audio
 from .tab_transcribe import TabTranscriber
+from .sse_transcribe import (
+    start_transcription_stream, 
+    stop_transcription_stream, 
+    add_audio_data, 
+    stream_events, 
+    get_stream_status
+)
 
 # Create blueprint
 bp = Blueprint('main', __name__)
@@ -24,6 +31,173 @@ def health_check():
         'status': 'healthy',
         'message': 'Service is running'
     }), 200
+
+# --- SSE Transcription Routes ---
+
+@bp.route('/start-stream', methods=['POST'])
+def start_stream():
+    """
+    Start a new SSE transcription stream
+    
+    Expects JSON with:
+    - stream_type: 'mic' or 'tab' (default: 'mic')
+    - interview_type: Type of interview (default: 'behavioral')
+    
+    Returns:
+    - session_id: Unique ID for the streaming session
+    """
+    try:
+        data = request.json or {}
+        stream_type = data.get('stream_type', 'mic')
+        interview_type = data.get('interview_type', 'behavioral')
+        
+        # Validate stream type
+        if stream_type not in ['mic', 'tab']:
+            return jsonify({
+                'error': 'Invalid stream_type. Must be "mic" or "tab"'
+            }), 400
+        
+        # Start the stream
+        session_id = start_transcription_stream(
+            interview_type=interview_type,
+            stream_type=stream_type
+        )
+        
+        return jsonify({
+            'status': 'success',
+            'message': f'{stream_type.capitalize()} transcription stream started',
+            'session_id': session_id
+        }), 200
+        
+    except Exception as e:
+        return jsonify({
+            'error': f'Error starting transcription stream: {str(e)}'
+        }), 500
+
+@bp.route('/stop-stream', methods=['POST'])
+def stop_stream():
+    """
+    Stop an SSE transcription stream
+    
+    Expects JSON with:
+    - session_id: ID of the stream to stop
+    
+    Returns:
+    - Success message or error
+    """
+    try:
+        data = request.json
+        
+        if not data or 'session_id' not in data:
+            return jsonify({
+                'error': 'No session ID provided'
+            }), 400
+        
+        session_id = data['session_id']
+        
+        # Stop the stream
+        success = stop_transcription_stream(session_id)
+        
+        if not success:
+            return jsonify({
+                'error': 'Invalid session ID or session already stopped'
+            }), 404
+        
+        return jsonify({
+            'status': 'success',
+            'message': 'Transcription stream stopped'
+        }), 200
+        
+    except Exception as e:
+        return jsonify({
+            'error': f'Error stopping transcription stream: {str(e)}'
+        }), 500
+
+@bp.route('/stream/<session_id>/events', methods=['GET'])
+def transcription_events(session_id):
+    """
+    SSE endpoint to receive real-time transcription updates
+    
+    Returns:
+    - Server-Sent Events stream with transcription updates
+    """
+    response = stream_events(session_id)
+    
+    if response is None:
+        return jsonify({
+            'error': 'Invalid session ID or session expired'
+        }), 404
+    
+    return response
+
+@bp.route('/stream/<session_id>/status', methods=['GET'])
+def transcription_status(session_id):
+    """
+    Get status of a transcription stream
+    
+    Returns:
+    - Status details or error
+    """
+    try:
+        status = get_stream_status(session_id)
+        
+        if not status:
+            return jsonify({
+                'error': 'Invalid session ID or session expired'
+            }), 404
+        
+        return jsonify(status), 200
+        
+    except Exception as e:
+        return jsonify({
+            'error': f'Error getting stream status: {str(e)}'
+        }), 500
+
+@bp.route('/stream/<session_id>/audio', methods=['POST'])
+def stream_audio(session_id):
+    """
+    Add audio data to a tab transcription stream
+    
+    Expects JSON with:
+    - audio_data: Array of audio samples
+    
+    Returns:
+    - Success message or error
+    """
+    try:
+        if not request.is_json:
+            return jsonify({
+                'error': 'Request must be JSON'
+            }), 400
+        
+        audio_data = request.json.get('audio_data')
+        if not audio_data:
+            return jsonify({
+                'error': 'No audio data provided'
+            }), 400
+        
+        # Convert to numpy array
+        audio_array = np.array(audio_data, dtype=np.float32)
+        
+        # Add to stream
+        success = add_audio_data(session_id, audio_array)
+        
+        if not success:
+            return jsonify({
+                'error': 'Invalid session ID, wrong stream type, or session expired'
+            }), 404
+        
+        return jsonify({
+            'status': 'success',
+            'message': 'Audio data added to stream'
+        }), 200
+        
+    except Exception as e:
+        return jsonify({
+            'error': f'Error adding audio data: {str(e)}'
+        }), 500
+
+# --- Original Routes ---
 
 @bp.route('/start-tab-recording', methods=['POST'])
 def start_tab_recording():
