@@ -39,7 +39,8 @@
     {
       "resources": [
         "src/scripts/*.js",
-        "src/resources/overlay.html"
+        "src/resources/overlay.html",
+        "assets/*.png"
       ],
       "matches": [
         "<all_urls>"

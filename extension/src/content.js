@@ -25,6 +25,11 @@ window.showModal = async function () {
   // Modal content
   modal.innerHTML = html
 
+  const logoImg = modal.querySelector('.logo');
+  if (logoImg) {
+    logoImg.src = chrome.runtime.getURL('assets/logo.png');
+  }
+
   // Append modal to the body
   document.body.appendChild(modal);
 
