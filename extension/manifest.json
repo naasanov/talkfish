@@ -6,19 +6,24 @@
   "permissions": [
     "storage",
     "activeTab",
-    "microphone",
-    "tabCapture"
+    "tabCapture",
+    "scripting",
+    "tabs"
+  ],
+  "host_permissions": [
+    "<all_urls>"
   ],
   "background": {
-    "service_worker": "src/background.js"
+    "service_worker": "src/background.js",
+    "type": "module"
   },
   "action": {
-    "default_popup": "src/popup/popup.html",
     "default_icon": {
-      "16": "icon.png",
-      "48": "icon.png",
-      "128": "icon.png"
-    }
+      "16": "./assets/fish.png",
+      "48": "./assets/fish.png",
+      "128": "./assets/fish.png"
+    },
+    "default_popup": "src/popup/popup.html"
   },
   "content_scripts": [
     {
@@ -33,7 +38,9 @@
   "web_accessible_resources": [
     {
       "resources": [
-        "src/scripts/*.js"
+        "src/scripts/*.js",
+        "src/resources/overlay.html",
+        "assets/*.png"
       ],
       "matches": [
         "<all_urls>"
