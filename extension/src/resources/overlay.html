@@ -118,12 +118,33 @@
       border-left: 5px solid #c57a28;
     }
 
+    .card.question span {
+      font-weight: bold;
+      display: block;
+      margin-bottom: 5px;
+      color: #c57a28;
+    }
+
     .card.tips {
       border-left: 5px solid #ffcc00;
     }
 
+    .card.tips span {
+      font-weight: bold;
+      display: block;
+      margin-bottom: 5px;
+      color: #ffcc00;
+    }
+
     .card.answer {
       border-left: 5px solid #4d8f4f;
+    }
+
+    .card.answer span {
+      font-weight: bold;
+      display: block;
+      margin-bottom: 5px;
+      color: #4d8f4f;
     }
   </style>
 </head>
@@ -136,15 +157,15 @@
     </div>
     <div class="card-container">
       <div class="card question">
-        <h3>Question</h3>
+        <span>Question</span>
         <p>What is the purpose of this feature?</p>
       </div>
       <div class="card tips">
-        <h3>Tips</h3>
+        <span>Tips</span>
         <p>Remember to keep your code modular and reusable.</p>
       </div>
       <div class="card answer">
-        <h3>Answer</h3>
+        <span>Answer</span>
         <p>This feature allows users to interact with the overlay dynamically.</p>
       </div>
     </div>
