@@ -3,7 +3,7 @@ from werkzeug.utils import secure_filename
 import os
 import numpy as np
 from .audio_processing import process_audio
-from .tab_transcribe import TabTranscriber
+# from .tab_transcribe import TabTranscriber
 
 # Create blueprint
 bp = Blueprint('main', __name__)
@@ -25,104 +25,104 @@ def health_check():
         'message': 'Service is running'
     }), 200
 
-@bp.route('/start-tab-recording', methods=['POST'])
-def start_tab_recording():
-    """Start recording tab audio"""
-    global tab_transcriber
+# @bp.route('/start-tab-recording', methods=['POST'])
+# def start_tab_recording():
+#     """Start recording tab audio"""
+#     global tab_transcriber
     
-    try:
-        interview_type = request.json.get('interview_type', 'behavioral')
+#     try:
+#         interview_type = request.json.get('interview_type', 'behavioral')
         
-        # Create new transcriber if needed
-        if tab_transcriber is None:
-            tab_transcriber = TabTranscriber(interview_type=interview_type)
+#         # Create new transcriber if needed
+#         if tab_transcriber is None:
+#             tab_transcriber = TabTranscriber(interview_type=interview_type)
         
-        tab_transcriber.start_recording()
+#         tab_transcriber.start_recording()
         
-        return jsonify({
-            'status': 'success',
-            'message': 'Tab recording started'
-        }), 200
+#         return jsonify({
+#             'status': 'success',
+#             'message': 'Tab recording started'
+#         }), 200
         
-    except Exception as e:
-        return jsonify({
-            'error': f'Error starting tab recording: {str(e)}'
-        }), 500
+#     except Exception as e:
+#         return jsonify({
+#             'error': f'Error starting tab recording: {str(e)}'
+#         }), 500
 
-@bp.route('/stop-tab-recording', methods=['POST'])
-def stop_tab_recording():
-    """Stop recording tab audio and return final transcript"""
-    global tab_transcriber
+# @bp.route('/stop-tab-recording', methods=['POST'])
+# def stop_tab_recording():
+#     """Stop recording tab audio and return final transcript"""
+#     global tab_transcriber
     
-    try:
-        if tab_transcriber is None:
-            return jsonify({
-                'error': 'No active tab recording'
-            }), 400
+#     try:
+#         if tab_transcriber is None:
+#             return jsonify({
+#                 'error': 'No active tab recording'
+#             }), 400
         
-        # Stop recording and get final transcript
-        tab_transcriber.stop_recording()
-        final_transcript = tab_transcriber.get_transcription()
+#         # Stop recording and get final transcript
+#         tab_transcriber.stop_recording()
+#         final_transcript = tab_transcriber.get_transcription()
         
-        # Analyze the transcript
-        feedback = tab_transcriber.analyze_transcript(final_transcript)
+#         # Analyze the transcript
+#         feedback = tab_transcriber.analyze_transcript(final_transcript)
         
-        # Clean up
-        tab_transcriber = None
+#         # Clean up
+#         tab_transcriber = None
         
-        return jsonify({
-            'status': 'success',
-            'transcript': final_transcript,
-            'feedback': feedback
-        }), 200
+#         return jsonify({
+#             'status': 'success',
+#             'transcript': final_transcript,
+#             'feedback': feedback
+#         }), 200
         
-    except Exception as e:
-        return jsonify({
-            'error': f'Error stopping tab recording: {str(e)}'
-        }), 500
+#     except Exception as e:
+#         return jsonify({
+#             'error': f'Error stopping tab recording: {str(e)}'
+#         }), 500
 
-@bp.route('/stream-tab-audio', methods=['POST'])
-def stream_tab_audio():
-    """Stream audio data from the tab"""
-    global tab_transcriber
+# @bp.route('/stream-tab-audio', methods=['POST'])
+# def stream_tab_audio():
+#     """Stream audio data from the tab"""
+#     global tab_transcriber
     
-    try:
-        if tab_transcriber is None:
-            return jsonify({
-                'error': 'No active tab recording'
-            }), 400
+#     try:
+#         if tab_transcriber is None:
+#             return jsonify({
+#                 'error': 'No active tab recording'
+#             }), 400
         
-        # Get audio data from request
-        if not request.is_json:
-            return jsonify({
-                'error': 'Request must be JSON'
-            }), 400
+#         # Get audio data from request
+#         if not request.is_json:
+#             return jsonify({
+#                 'error': 'Request must be JSON'
+#             }), 400
         
-        # Extract audio data from request
-        audio_data = request.json.get('audio_data')
-        if not audio_data:
-            return jsonify({
-                'error': 'No audio data provided'
-            }), 400
+#         # Extract audio data from request
+#         audio_data = request.json.get('audio_data')
+#         if not audio_data:
+#             return jsonify({
+#                 'error': 'No audio data provided'
+#             }), 400
         
-        # Convert audio data to numpy array
-        audio_array = np.array(audio_data, dtype=np.float32)
+#         # Convert audio data to numpy array
+#         audio_array = np.array(audio_data, dtype=np.float32)
         
-        # Add to transcriber
-        tab_transcriber.add_audio_data(audio_array)
+#         # Add to transcriber
+#         tab_transcriber.add_audio_data(audio_array)
         
-        # Get current transcription
-        current_transcript = tab_transcriber.get_transcription()
+#         # Get current transcription
+#         current_transcript = tab_transcriber.get_transcription()
         
-        return jsonify({
-            'status': 'success',
-            'transcript': current_transcript
-        }), 200
+#         return jsonify({
+#             'status': 'success',
+#             'transcript': current_transcript
+#         }), 200
         
-    except Exception as e:
-        return jsonify({
-            'error': f'Error processing tab audio: {str(e)}'
-        }), 500
+#     except Exception as e:
+#         return jsonify({
+#             'error': f'Error processing tab audio: {str(e)}'
+#         }), 500
 
 @bp.route('/analyze', methods=['POST'])
 def analyze_interview():

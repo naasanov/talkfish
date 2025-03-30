@@ -72,4 +72,14 @@ window.showModal = async function () {
       button.textContent = '▶';
     }
   });
+
+  document.getElementById('test').addEventListener('click', () => {
+    fetch('http://localhost:5001/test', {
+      method: 'POST'
+    }).then(() => {
+      console.log("successful request")
+    }).catch((err) => {
+      console.log("error", err)
+    })
+  })
 };
