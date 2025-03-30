@@ -1,163 +1,183 @@
 import pyaudio
+import wave
 import numpy as np
 import time
 import os
-import sys
+from datetime import datetime
 
-# Add the backend directory to Python path for imports
-backend_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-if backend_dir not in sys.path:
-    sys.path.insert(0, backend_dir)
-
-from app.transcription_service import TranscriptionService
-
-class VirtualInputDevice:
+class SystemAudioRecorder:
     def __init__(self):
-        self.p = pyaudio.PyAudio()
         self.CHUNK = 1024
         self.FORMAT = pyaudio.paFloat32
-        self.CHANNELS = 1  # Mono input
-        self.RATE = 12000
-        self.source_device = None  # The real device with 2 output channels
-        self.stream = None
-        self.audio_data = []
+        self.CHANNELS = 2  # Stereo for system audio
+        self.RATE = 44100  # Standard audio rate
+        self.RECORD_SECONDS = 10
+        self.p = pyaudio.PyAudio()
         
-        # Initialize transcription service
-        self.transcription_service = TranscriptionService()
-        self.transcription_service.start()
+        # Create recordings directory if it doesn't exist
+        self.recordings_dir = os.path.join(os.path.dirname(__file__), "recordings")
+        os.makedirs(self.recordings_dir, exist_ok=True)
         
     def list_devices(self):
         """List all available audio devices"""
-        info = self.p.get_host_api_info_by_index(0)
-        numdevices = info.get('deviceCount')
-        
         print("\nAvailable Audio Devices:")
         print("------------------------")
-        output_devices = []
         
-        for i in range(numdevices):
-            device_info = self.p.get_device_info_by_host_api_device_index(0, i)
-            print(f"Device {i}: {device_info['name']}")
-            print(f"  Output channels: {device_info['maxOutputChannels']}")
+        blackhole_input_index = None
+        blackhole_output_index = None
+        all_devices = []
+        
+        for i in range(self.p.get_device_count()):
+            device_info = self.p.get_device_info_by_index(i)
+            device_name = device_info['name']
+            
+            print(f"Device {i}: {device_name}")
             print(f"  Input channels: {device_info['maxInputChannels']}")
-            print(f"  Sample Rate: {int(device_info['defaultSampleRate'])}Hz")
+            print(f"  Output channels: {device_info['maxOutputChannels']}")
+            print(f"  Default Sample Rate: {device_info['defaultSampleRate']}")
             print("------------------------")
             
-            # Store devices with 2 output channels
-            if device_info['maxOutputChannels'] == 2:
-                output_devices.append((i, device_info['name']))
-                
-        return output_devices
-
-    def create_virtual_input_device(self, source_device_index):
-        """Create a virtual input device that receives from a 2-channel output device"""
-        self.source_device = self.p.get_device_info_by_index(source_device_index)
-        
-        # Open stream for virtual input device
-        self.stream = self.p.open(
-            format=self.FORMAT,
-            channels=self.CHANNELS,
-            rate=16000,
-            input=True,
-            frames_per_buffer=self.CHUNK,
-            stream_callback=self.audio_callback
-        )
-        
-        print("\nVirtual input device created successfully!")
-        print(f"Source device: {self.source_device['name']}")
-        print(f"Input channels: {self.CHANNELS}")
-        print(f"Sample rate: {self.RATE}Hz")
-        print("\nPress Ctrl+C to stop the virtual device...")
-        
-        # Start the stream
-        self.stream.start_stream()
-        
-    def audio_callback(self, in_data, frame_count, time_info, status):
-        """
-        Callback function that receives audio from the source device
-        and converts it to mono for the virtual input device
-        """
-        if status:
-            print(f"Status: {status}")
+            all_devices.append((i, device_name, device_info))
             
-        # Convert input data to numpy array
-        audio_data = np.frombuffer(in_data, dtype=np.float32)
+            # Check for BlackHole
+            if 'BlackHole' in device_name or 'blackhole' in device_name.lower():
+                if device_info['maxInputChannels'] > 0:
+                    blackhole_input_index = i
+                if device_info['maxOutputChannels'] > 0:
+                    blackhole_output_index = i
         
-        # Store audio data for transcription
-        self.audio_data.append(audio_data.copy())
-        
-        # Send to transcription service
-        self.transcription_service.add_audio_data(audio_data, 'tab')
-        
-        return (in_data, pyaudio.paContinue)
-
-    def get_transcription(self):
-        """Get the current transcription."""
-        return self.transcription_service.get_transcription('tab')
-
-    def stop_recording(self):
-        """Stop recording and clean up."""
-        if self.stream:
-            self.stream.stop_stream()
-            self.stream.close()
-        self.transcription_service.stop()
-        self.p.terminate()
+        return all_devices, blackhole_input_index, blackhole_output_index
+    
+    def record_audio(self, input_device_index):
+        """Record audio from the specified input device"""
+        try:
+            device_info = self.p.get_device_info_by_index(input_device_index)
+            device_name = device_info['name']
+            
+            print(f"\nRecording from: {device_name}")
+            print(f"Input channels: {device_info['maxInputChannels']}")
+            print(f"Sample rate: {device_info['defaultSampleRate']}Hz")
+            
+            # Open input stream
+            stream = self.p.open(
+                format=self.FORMAT,
+                channels=min(self.CHANNELS, int(device_info['maxInputChannels'])),
+                rate=int(device_info['defaultSampleRate']),
+                input=True,
+                input_device_index=input_device_index,
+                frames_per_buffer=self.CHUNK
+            )
+            
+            print(f"\nRecording for {self.RECORD_SECONDS} seconds...")
+            print("Please play audio on your system now...")
+            
+            frames = []
+            
+            # Record audio
+            start_time = time.time()
+            while time.time() - start_time < self.RECORD_SECONDS:
+                try:
+                    data = stream.read(self.CHUNK)
+                    frames.append(data)
+                    
+                    # Print progress
+                    seconds = time.time() - start_time
+                    if int(seconds) != int(seconds - 0.1):
+                        # Convert to numpy array for level analysis
+                        audio_chunk = np.frombuffer(data, dtype=np.float32)
+                        rms = np.sqrt(np.mean(np.square(audio_chunk)))
+                        peak = np.max(np.abs(audio_chunk))
+                        
+                        print(f"\rRecording: {seconds:.1f}s | "
+                              f"RMS: {rms:.3f} | "
+                              f"Peak: {peak:.3f}", end='', flush=True)
+                        
+                except Exception as e:
+                    print(f"\nError reading audio chunk: {e}")
+                    continue
+            
+            print("\n\nFinished recording!")
+            
+            # Stop and close the stream
+            stream.stop_stream()
+            stream.close()
+            
+            # Save the recorded audio
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            filename = os.path.join(self.recordings_dir, f"system_audio_{timestamp}.wav")
+            
+            # Process the recorded audio
+            print("\nProcessing audio data...")
+            audio_data = np.frombuffer(b''.join(frames), dtype=np.float32)
+            
+            # Save as WAV file
+            print("\nSaving audio file...")
+            with wave.open(filename, 'wb') as wf:
+                wf.setnchannels(min(self.CHANNELS, int(device_info['maxInputChannels'])))
+                wf.setsampwidth(2)  # 2 bytes for int16
+                wf.setframerate(int(device_info['defaultSampleRate']))
+                
+                # Scale and convert to int16
+                print("Converting to 16-bit audio...")
+                audio_int16 = (audio_data * 32767).astype(np.int16)
+                wf.writeframes(audio_int16.tobytes())
+            
+            print(f"\nRecording saved to: {filename}")
+            return filename
+            
+        except Exception as e:
+            print(f"Error recording audio: {e}")
+            import traceback
+            traceback.print_exc()
+            return None
+        finally:
+            self.p.terminate()
 
 def main():
-    print("Initializing system audio transcriber...")
-    virtual_device = VirtualInputDevice()
+    recorder = SystemAudioRecorder()
     
-    # List available devices and get devices with 2 output channels
-    output_devices = virtual_device.list_devices()
+    # List available devices and check for BlackHole
+    all_devices, blackhole_input, blackhole_output = recorder.list_devices()
     
-    if not output_devices:
-        print("No devices with 2 output channels found!")
+    if blackhole_input is not None:
+        print(f"\n✅ BlackHole input device detected! (Device ID: {blackhole_input})")
+        print(f"To record system audio:")
+        print(f"1. Go to System Preferences/Settings > Sound > Output")
+        print(f"2. Select 'BlackHole 2ch' as your output device")
+        print(f"3. Play audio that you want to capture")
+        print(f"4. Select BlackHole as the input device below")
+    else:
+        print("\n❌ BlackHole input device not detected.")
+        print("\nTo record system audio on macOS, please follow these steps:")
+        print("1. Install BlackHole: brew install blackhole-2ch")
+        print("2. Restart your computer")
+        print("3. Run this script again")
+    
+    # Create a list of input devices
+    input_devices = [(idx, name) for idx, name, info in all_devices if info['maxInputChannels'] > 0]
+    
+    if not input_devices:
+        print("No input devices found!")
         return
     
-    print("\nAvailable source devices (2 output channels):")
-    for idx, (device_id, name) in enumerate(output_devices):
-        print(f"{idx}: {name} (Device ID: {device_id})")
+    print("\nSelect an input device to record from:")
+    for i, (device_id, name) in enumerate(input_devices):
+        if device_id == blackhole_input:
+            print(f"{i}: {name} (Device ID: {device_id}) ← RECOMMENDED for system audio")
+        else:
+            print(f"{i}: {name} (Device ID: {device_id})")
     
     try:
-        selection = int(input("\nSelect source device number: "))
-        if 0 <= selection < len(output_devices):
-            source_device_id = output_devices[selection][0]
-            
-            print("Starting recording. Will record for 30 seconds...")
-            virtual_device.create_virtual_input_device(source_device_id)
-            
-            # Record for 30 seconds while showing intermediate transcriptions
-            start_time = time.time()
-            timer = 0
-            print("Recording started...\n\n")
-            
-            while time.time() - start_time < 10:
-                time.sleep(1)  # Check every 1 second
-                if timer % 5 == 0:
-                    print("Current time: ", timer, "seconds")
-                timer += 1
-                transcript = virtual_device.get_transcription()
-                if transcript:
-                    print("\rCurrent transcription:", transcript, end="", flush=True)
-            
-            # Stop recording and get final transcription
-            print("\n\nStopping recording...")
-            virtual_device.stop_recording()
-            
-            # Get and print final transcription
-            final_transcript = virtual_device.get_transcription()
-            print("\nFinal Transcription:")
-            print(final_transcript)
-            
+        selection = int(input("\nSelect device number: "))
+        if 0 <= selection < len(input_devices):
+            device_id = input_devices[selection][0]
+            recorder.record_audio(device_id)
         else:
             print("Invalid selection!")
     except ValueError:
         print("Invalid input!")
     except KeyboardInterrupt:
         print("\nRecording interrupted by user")
-    finally:
-        if hasattr(virtual_device, 'stream') and virtual_device.stream:
-            virtual_device.stop_recording()
 
 if __name__ == "__main__":
     main()
