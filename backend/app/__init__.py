@@ -1,4 +1,4 @@
-from flask import Flask
+from flask import Flask, request
 from flask_cors import CORS
 import os
 
@@ -28,8 +28,13 @@ def create_app(test_config=None):
     except OSError:
         pass
 
+    # Log all incoming requests
+    @app.before_request
+    def log_request():
+        print(f"Request received: {request.method} {request.path} from {request.remote_addr}")
+
     # Register blueprints
     from .routes import bp
     app.register_blueprint(bp)
 
-    return app 
+    return app
