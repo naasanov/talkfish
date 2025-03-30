@@ -36,10 +36,6 @@ window.showModal = async function () {
   // Show the modal
   modal.style.display = 'block';
 
-  // Close modal function
-  function closeModal() {
-    modal.style.display = 'none';
-  }
 
   function stopStreamOnServer() {
     fetch('http://localhost:5000/stop-stream', {
@@ -71,6 +67,7 @@ window.showModal = async function () {
       if (eventSource) {
         eventSource.close()
       }
+      stopStreamOnServer()
       button.classList.remove('recording');
       button.textContent = '▶';
     }
