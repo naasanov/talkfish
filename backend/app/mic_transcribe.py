@@ -96,7 +96,7 @@ def main():
         start_time = time.time()
         timer = 0
         print("Recording started...\n\n")
-        while time.time() - start_time < 5: 
+        while time.time() - start_time < 30: 
             time.sleep(1)  # Check every 1 seconds
             if timer % 5 == 0:
                 print("Current time: ", timer, "seconds")
