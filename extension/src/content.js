@@ -41,17 +41,36 @@ window.showModal = async function () {
     modal.style.display = 'none';
   }
 
-  // Event listeners
-  // document.getElementById('closeModal').addEventListener('click', closeModal);
+  function stopStreamOnServer() {
+    fetch('http://localhost:5000/stop-stream', {
+      method: 'POST',
+    })
+      .then(response => response.text())
+      .then(data => {
+        console.log(data);  // "Stream will stop"
+      })
+      .catch(error => {
+        console.error("Error stopping the stream:", error);
+      });
+  }
+
+  let eventSource = null
 
   // Example of running a script from the modal
   document.getElementById('toggle').addEventListener('click', function () {
     isRecording = !isRecording;
     const button = document.getElementById('toggle');
     if (isRecording) {
+      const eventSource = new EventSource('http://localhost:5000/start-stream');
+      eventSource.onmessage = (event) => {
+        // add cards, etc.
+      }
       button.classList.add('recording');
       button.textContent = '⏸';
     } else {
+      if (eventSource) {
+        eventSource.close()
+      }
       button.classList.remove('recording');
       button.textContent = '▶';
     }
