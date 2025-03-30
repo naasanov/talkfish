@@ -20,11 +20,14 @@
       left: auto;
       width: 500px;
       height: 300px;
+      background: linear-gradient(to bottom left,
+          #5A89BB 33%,
+          rgba(128, 128, 128, 0.5) 100%);
       z-index: 9999;
     }
 
     #toggle {
-      background-color: #4CAF50;
+      background-color: #3e90e7;
       color: white;
       border: none;
       border-radius: 50%;
@@ -41,7 +44,7 @@
     }
 
     #toggle:hover {
-      background-color: #45a049;
+      background-color: #3e90e7;
       transform: scale(1.1);
     }
 
@@ -75,10 +78,52 @@
       width: 100%;
     }
 
+    .logo {
+      height: 70px;
+      width: auto;
+    }
+
     #title {
       font-size: 24px;
       font-weight: bold;
       color: white;
+    }
+
+
+    .card-container {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      overflow-y: auto;
+      max-height: 80%;
+      /* Adjust height as needed */
+      width: 90%;
+      /* Adjust width as needed */
+      padding: 10px;
+    }
+
+
+    .card {
+      background-color: white;
+      border-radius: 10px;
+      padding: 20px;
+      margin-top: 10px;
+      margin-bottom: 10px;
+      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+      font-family: Arial, sans-serif;
+      color: #333;
+    }
+
+    .card.question {
+      border-left: 5px solid #c57a28;
+    }
+
+    .card.tips {
+      border-left: 5px solid #ffcc00;
+    }
+
+    .card.answer {
+      border-left: 5px solid #4d8f4f;
     }
   </style>
 </head>
@@ -87,7 +132,21 @@
   <div class="overlay">
     <div class="header">
       <button id="toggle">▶</button>
-      <span id="title">Mock Interview</span>
+      <span><img src="../../assets/logo.png" alt="TalkFish" class="logo"></img></span>
+    </div>
+    <div class="card-container">
+      <div class="card question">
+        <h3>Question</h3>
+        <p>What is the purpose of this feature?</p>
+      </div>
+      <div class="card tips">
+        <h3>Tips</h3>
+        <p>Remember to keep your code modular and reusable.</p>
+      </div>
+      <div class="card answer">
+        <h3>Answer</h3>
+        <p>This feature allows users to interact with the overlay dynamically.</p>
+      </div>
     </div>
   </div>
 </body>
