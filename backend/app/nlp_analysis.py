@@ -38,55 +38,28 @@ except Exception as e:
 
 # System prompt for interview feedback
 SYSTEM_PROMPT = """
-You are an expert interview coach specializing in behavioral interviews. Your task is to analyze interview responses and provide constructive, actionable feedback.
+You are an expert interview coach. Provide extremely concise feedback on interview responses in just a few sentences.
 
 Follow these guidelines:
-1. Evaluate responses using the STAR method (Situation, Task, Action, Result)
-2. Identify strengths and areas for improvement
-3. Check for clarity, conciseness, and relevance
-4. Note any overuse of filler words or passive voice
-5. Provide specific examples from the transcript to support your feedback
-6. Suggest improvements with concrete examples
-7. Maintain a supportive, encouraging tone
-8. Structure your analysis with clear sections
-9. Rate the overall response on a scale of 1-10
-10. Keep feedback constructive and actionable
-11. Consider the specific type of behavioral question asked
-12. Evaluate whether the response actually answers the question being asked
+1. Keep feedback brief and direct - no more than 3-4 sentences total
+2. Be specific and actionable
+3. Mention STAR principles (Situation, Task, Action, Result) only if relevant
+4. Focus on 1-2 key improvements
+5. Use a supportive, encouraging tone
 
 Your output should be a JSON object with the following structure:
 {
-  "message": "Brief summary of overall feedback (1-2 sentences)",
+  "message": "1-3 sentence concise feedback",
   "type": "positive | neutral | constructive",
   "details": {
-    "question_type": "The detected question type",
-    "question_relevance": 1-10, 
-    "star_analysis": {
-      "situation": {"present": true/false, "strength": 1-10, "feedback": "..."},
-      "task": {"present": true/false, "strength": 1-10, "feedback": "..."},
-      "action": {"present": true/false, "strength": 1-10, "feedback": "..."},
-      "result": {"present": true/false, "strength": 1-10, "feedback": "..."}
-    },
-    "language_quality": {
-      "filler_words": {"frequency": "low|medium|high", "examples": [...]},
-      "clarity": 1-10,
-      "conciseness": 1-10
-    },
-    "improvement_suggestions": ["...", "...", "..."],
-    "overall_score": 1-10
+    "suggestion": "One specific improvement suggestion"
   }
 }
 """
 
 def analyze_transcript(transcript, interview_type='behavioral', context=None, question_type=None):
     """
-    Analyzes the interview transcript using Gemini API and provides detailed feedback.
-    
-    Parameters:
-    - transcript: The interviewee's response text
-    - interview_type: The type of interview (behavioral, technical, etc.)
-    - context: Optional full conversation context including interviewer's question
-    - question_type: Optional detected question category
+    Analyzes the interview transcript using Gemini API and provides very concise feedback.
     """
     print("\nIn analyze_transcript function")
     print(f"Transcript length: {len(transcript)} chars")
@@ -98,9 +71,8 @@ def analyze_transcript(transcript, interview_type='behavioral', context=None, qu
     try:
         # Extract basic statistics
         word_count = len(transcript.split())
-        sentence_count = len([s for s in transcript.split('.') if s.strip()])
         
-        print(f"Analyzing transcript with {word_count} words, {sentence_count} sentences")
+        print(f"Analyzing transcript with {word_count} words")
         
         # Prepare prompt for Gemini
         user_prompt = f"""
@@ -114,7 +86,7 @@ def analyze_transcript(transcript, interview_type='behavioral', context=None, qu
         else:
             user_prompt += f"Interviewee Response: \"{transcript}\"\n\n"
         
-        user_prompt += "Please analyze this interview response and provide detailed feedback following the guidelines."
+        user_prompt += "Provide extremely concise feedback in just a few sentences."
         
         # Create combined prompt with instructions and user prompt
         combined_prompt = f"""
@@ -170,20 +142,19 @@ def analyze_transcript(transcript, interview_type='behavioral', context=None, qu
                 feedback_json = json.loads(cleaned_text)
                 print("Successfully parsed JSON response")
                 
-                # Add transcript metadata
-                feedback_json['details']['transcript_stats'] = {
-                    'word_count': word_count,
-                    'sentence_count': sentence_count
+                # Simplify to ensure it's just what we want
+                simplified_feedback = {
+                    'message': feedback_json.get('message', 'Good effort, but could be improved.'),
+                    'type': feedback_json.get('type', 'neutral'),
+                    'details': {
+                        'suggestion': feedback_json.get('details', {}).get('suggestion', 'Add more specific examples.')
+                    }
                 }
                 
-                # Add question type if detected
-                if question_type and 'question_type' not in feedback_json['details']:
-                    feedback_json['details']['question_type'] = question_type
-                
                 print("Feedback generated:")
-                print(feedback_json)
+                print(simplified_feedback)
                 
-                return feedback_json
+                return simplified_feedback
             except json.JSONDecodeError as json_error:
                 print(f"JSON parse error: {str(json_error)}")
                 raise
@@ -194,15 +165,10 @@ def analyze_transcript(transcript, interview_type='behavioral', context=None, qu
             print(f"Raw response: {raw_text}")
             
             fallback = {
-                'message': "I analyzed your response but encountered an error formatting the detailed feedback.",
+                'message': "Good effort, but try to include a clear situation, your specific action, and the outcome.",
                 'type': 'neutral',
                 'details': {
-                    'transcript_stats': {
-                        'word_count': word_count,
-                        'sentence_count': sentence_count
-                    },
-                    'question_type': question_type if question_type else "Unknown",
-                    'error': 'Failed to parse AI response'
+                    'suggestion': "Add more context and specific examples of what you did."
                 }
             }
             
@@ -232,23 +198,22 @@ def fallback_analysis(transcript, interview_type, question_type=None):
     word_count = len(transcript.split())
     
     if word_count < 50:
-        message = "Your response was quite brief. Consider providing more details using the STAR method."
+        message = "Your response is too brief. Add more specific details about what you did and the results."
         feedback_type = "constructive"
+        suggestion = "Expand your answer with a specific example."
     elif word_count > 300:
-        message = "Your response was comprehensive but could be more concise while maintaining the STAR structure."
+        message = "Good detail, but try to be more concise while keeping your key points."
         feedback_type = "neutral"
+        suggestion = "Focus on your most impactful actions and results."
     else:
-        message = "Your response had a good length. Check that you covered all elements of the STAR method."
+        message = "Good length. Add more specific details about your actions and the measurable results."
         feedback_type = "positive"
+        suggestion = "Quantify your results to show your impact."
     
     return {
         'message': message,
         'type': feedback_type,
         'details': {
-            'transcript_stats': {
-                'word_count': word_count
-            },
-            'question_type': question_type if question_type else "Unknown",
-            'note': 'Limited analysis provided due to API connection issue.'
+            'suggestion': suggestion
         }
     }
