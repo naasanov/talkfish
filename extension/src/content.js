@@ -1,8 +1,12 @@
-// Inject audio capture and feedback display scripts into the page
-const scripts = ["scripts/audioCapture.js", "scripts/feedbackDisplay.js"];
+// const scripts = [
+//   "src/scripts/overlay.js"
+// ];
 
-scripts.forEach((script) => {
-  const scriptElement = document.createElement("script");
-  scriptElement.src = chrome.runtime.getURL(script);
-  document.head.appendChild(scriptElement);
-});
+// console.log("running content")
+
+// scripts.forEach((script) => {
+//   const scriptElement = document.createElement("script");
+//   scriptElement.src = chrome.runtime.getURL(script);
+//   scriptElement.type = "module"
+//   document.head.appendChild(scriptElement);
+// });

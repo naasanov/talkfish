@@ -21,18 +21,48 @@ chrome.action.onClicked.addListener((tab) => {
   });
 });
 
-function injectOverlay() {
-  const iframe = document.createElement('iframe');
-  iframe.style.backgroundColor = 'transparent';
-  iframe.style.position = 'fixed';
-  iframe.style.top = '10px';
-  iframe.style.right = '10px';
-  iframe.style.left = 'auto';
-  iframe.style.width = '500px';
-  iframe.style.height = '300px';
-  iframe.style.border = 'none';
-  iframe.style.zIndex = '9999';
-  iframe.src = chrome.runtime.getURL('src/resources/overlay.html');
+async function injectOverlay() {
+  const overlayContainer = document.createElement('div');
+  overlayContainer.style.backgroundColor = 'transparent';
+  overlayContainer.style.position = 'fixed';
+  overlayContainer.style.top = '10px';
+  overlayContainer.style.right = '10px';
+  overlayContainer.style.left = 'auto';
+  overlayContainer.style.width = '500px';
+  overlayContainer.style.height = '300px';
+  overlayContainer.style.border = 'none';
+  overlayContainer.style.zIndex = '9999';
 
-  document.body.appendChild(iframe);
+  // use shadow DOM for proper security and interface
+  const shadow = overlayContainer.attachShadow({ mode: "open" });
+
+  try {
+    const response = await fetch(chrome.runtime.getURL("src/resources/overlay.html"));
+    const html = await response.text();
+
+    const overlayContent = document.createElement('div');
+    overlayContent.innerHTML = html;
+
+    shadow.appendChild(overlayContent);
+    document.body.appendChild(overlayContainer);
+
+    const scripts = ["overlay.js"].map(s => `src/scripts/${s}`)
+    scripts.forEach((script) => {
+      // Instead of injecting as a script tag, fetch and execute the code
+      fetch(chrome.runtime.getURL(script))
+        .then(response => response.text())
+        .then(code => {
+          const scriptElement = document.createElement("script");
+          // Wrap the code to provide access to shadow DOM elements
+          scriptElement.textContent = `
+            (function(root) {
+              ${code}
+            })(document.querySelector('div').shadowRoot);
+          `;
+          shadow.appendChild(scriptElement);
+        });
+    });
+  } catch (error) {
+    console.error("Error loading overlay.html:", error);
+  }
 }

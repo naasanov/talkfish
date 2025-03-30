@@ -1,4 +1,5 @@
-// audioCapture.js
+const ServerCommunication = require("./serverCommunication");
+
 class AudioCapture {
     constructor() {
       this.audioContext = null;
@@ -113,14 +114,10 @@ class AudioCapture {
   
       // Create a blob from the audio chunks
       const audioBlob = new Blob(this.audioChunks, { type: 'audio/webm; codecs=opus' });
-      
+      console.log(audioBlob)
       // Send to server for processing
-      const serverCommunication = new ServerCommunication();
-      const feedback = await serverCommunication.sendAudioForProcessing(audioBlob);
-      
-      // Display feedback
-      const feedbackDisplay = new FeedbackDisplay();
-      feedbackDisplay.showFeedback(feedback);
+      // const serverCommunication = new ServerCommunication();
+      // await serverCommunication.sendAudioForProcessing(audioBlob);
       
       this.cleanup();
     }
@@ -144,4 +141,3 @@ class AudioCapture {
   }
   
   // Export for use in other modules
-  export default AudioCapture;

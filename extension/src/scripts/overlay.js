@@ -1,5 +1,8 @@
-let isRecording = false;
+console.log("hello world")
 
+let isRecording = false;
+let mediaRecorder = null;
+console.log("running overlay")
 function startFunc() {
   console.log("startFunc");
 }
@@ -9,6 +12,7 @@ function stopFunc() {
 }
 
 document.getElementById("toggle").addEventListener("click", () => {
+  console.log("click")
   isRecording = !isRecording;
   const button = document.getElementById("toggle");
   if (isRecording) {
