@@ -3,7 +3,7 @@ from werkzeug.utils import secure_filename
 import os
 import numpy as np
 from .audio_processing import process_audio
-from .tab_transcribe import TabTranscriber
+#from .tab_transcribe import TabTranscriber
 
 # Create blueprint
 bp = Blueprint('main', __name__)
@@ -34,10 +34,10 @@ def start_tab_recording():
         interview_type = request.json.get('interview_type', 'behavioral')
         
         # Create new transcriber if needed
-        if tab_transcriber is None:
-            tab_transcriber = TabTranscriber(interview_type=interview_type)
+        #if tab_transcriber is None:
+            #tab_transcriber = TabTranscriber(interview_type=interview_type)
         
-        tab_transcriber.start_recording()
+        #tab_transcriber.start_recording()
         
         return jsonify({
             'status': 'success',
@@ -61,14 +61,14 @@ def stop_tab_recording():
             }), 400
         
         # Stop recording and get final transcript
-        tab_transcriber.stop_recording()
+        #tab_transcriber.stop_recording()
         final_transcript = tab_transcriber.get_transcription()
         
         # Analyze the transcript
         feedback = tab_transcriber.analyze_transcript(final_transcript)
         
         # Clean up
-        tab_transcriber = None
+        #tab_transcriber = None
         
         return jsonify({
             'status': 'success',
@@ -109,7 +109,7 @@ def stream_tab_audio():
         audio_array = np.array(audio_data, dtype=np.float32)
         
         # Add to transcriber
-        tab_transcriber.add_audio_data(audio_array)
+        #tab_transcriber.add_audio_data(audio_array)
         
         # Get current transcription
         current_transcript = tab_transcriber.get_transcription()
