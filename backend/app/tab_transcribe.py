@@ -1,13 +1,13 @@
 import pyaudio
-import wave
 import numpy as np
 import time
+import threading
 import os
 import subprocess
-import threading
-from typing import Optional
 import sys
+from typing import Optional
 from datetime import datetime
+import wave
 
 # Add the backend directory to Python path for imports
 backend_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -17,17 +17,10 @@ if backend_dir not in sys.path:
 from app.transcription_service import TranscriptionService
 from app.nlp_analysis import analyze_transcript
 
-class BlackHoleRecorder:
-    """
-    Records system audio via BlackHole on macOS and transcribes it.
-    
-    This class follows the same structure as MicrophoneTranscriber but is specialized
-    for capturing system audio through BlackHole instead of microphone input.
-    """
-    
-    def __init__(self, chunk_size=1024, sample_rate=16000, interview_type='behavioral'):
+class SystemAudioTranscriber:
+    def __init__(self, chunk_size: int = 1024, sample_rate: int = 16000, interview_type: str = 'behavioral'):
         """
-        Initialize the BlackHole recorder.
+        Initialize the system audio transcriber using BlackHole.
         
         Args:
             chunk_size: Number of audio frames per buffer
@@ -50,8 +43,9 @@ class BlackHoleRecorder:
         
         # Recording control
         self.is_recording = False
-        self.recording_thread = None
+        self.recording_thread: Optional[threading.Thread] = None
         self.frames = []  # For storing audio frames for WAV file
+        self.recording_duration = 10  # Default recording duration
         
         # Create recordings directory if it doesn't exist
         self.recordings_dir = os.path.join(os.path.dirname(__file__), "recordings")
@@ -62,7 +56,11 @@ class BlackHoleRecorder:
         
         # Store original audio output device
         self.original_output = self.get_current_audio_output()
-    
+        
+        # Device info for recording
+        self.device_sample_rate = sample_rate
+        self.device_channels = 2
+
     def find_audio_devices(self):
         """Find BlackHole and system audio devices"""
         print("\nSearching for audio devices...")
@@ -328,7 +326,7 @@ class BlackHoleRecorder:
         except Exception as e:
             print(f"Error testing BlackHole audio: {e}")
             return False
-    
+
     def start_recording(self, duration=10, auto_route=True):
         """Start recording from BlackHole."""
         if self.is_recording:
@@ -371,8 +369,6 @@ class BlackHoleRecorder:
 
     def stop_recording(self):
         """Stop recording from BlackHole."""
-
-        
         self.is_recording = False
         if self.recording_thread:
             self.recording_thread.join(timeout=2.0)
@@ -411,11 +407,11 @@ class BlackHoleRecorder:
             print(f"Sample rate: {device_info['defaultSampleRate']}Hz")
             print(f"Recording for {self.recording_duration} seconds...")
             
-            # Open input stream
+            # Open input stream with the sample rate that matches the transcription service
             stream = self.audio.open(
                 format=self.format,
                 channels=self.device_channels,
-                rate=self.device_sample_rate,
+                rate=self.sample_rate,  # Use the sample rate expected by the transcription service
                 input=True,
                 input_device_index=self.blackhole_input,
                 frames_per_buffer=self.chunk_size
@@ -452,13 +448,8 @@ class BlackHoleRecorder:
                     # Apply volume increase for transcription
                     amplified_data = self.increase_volume(audio_data, gain_factor=5.0)
                     
-                    # Resample if needed for the transcription service
-                    if self.device_sample_rate != 16000:
-                        # Simple resampling - in production you'd want a better resampling method
-                        resampled = amplified_data[::int(self.device_sample_rate/16000)]
-                        self.transcription_service.add_audio_data(resampled, 'tab')
-                    else:
-                        self.transcription_service.add_audio_data(amplified_data, 'tab')
+                    # Send directly to transcription service without resampling
+                    self.transcription_service.add_audio_data(amplified_data, 'tab')
                     
                     # Print progress and current transcription every second
                     elapsed = time.time() - self.start_time
@@ -501,7 +492,7 @@ class BlackHoleRecorder:
             
         try:
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            filename = os.path.join(self.recordings_dir, f"blackhole_audio_{timestamp}.wav")
+            filename = os.path.join(self.recordings_dir, f"system_audio_{timestamp}.wav")
             
             # Process the recorded audio
             print("\nProcessing audio data...")
@@ -572,7 +563,7 @@ class BlackHoleRecorder:
         compressed = np.sign(normalized) * (1 - np.exp(-1 * np.abs(normalized)))
         
         # 3. Apply gain factor (logarithmic scale)
-        amplified = compressed * 0.5 #gain_factor
+        amplified = compressed * 0.8 #gain_factor
         
         # 4. Clip to prevent distortion (-1.0 to 1.0 for float32 audio)
         amplified = np.clip(amplified, -1.0, 1.0)
@@ -614,8 +605,8 @@ def main():
     # Print setup instructions
     print_blackhole_setup_instructions()
     
-    # Create recorder
-    recorder = BlackHoleRecorder(chunk_size=1024, sample_rate=16000)
+    # Create transcriber
+    transcriber = SystemAudioTranscriber(chunk_size=1024, sample_rate=48000)
     
     try:
         # Start recording with automatic routing
@@ -625,30 +616,38 @@ def main():
         print("2. Create a Multi-Output Device that routes audio to both:")
         print("   - BlackHole (for recording)")
         print("   - Your speakers (so you can hear it)")
-        print("3. Record audio for 10 seconds")
+        print("3. Record audio for 30 seconds")
         print("4. Restore your original audio output setting")
         print("=====================================")
         
-        # Start recording (10 seconds by default)
-        if recorder.start_recording(duration=10, auto_route=True):
+        # Start recording (30 seconds by default)
+        if transcriber.start_recording(duration=10, auto_route=True):
             # Wait for recording to complete
             start_time = time.time()
-            while recorder.is_recording and time.time() - start_time < 15:  # 5 second buffer
-                time.sleep(0.5)
+            timer = 0
+            print("Recording started...\n\n")
+            
+            while transcriber.is_recording and time.time() - start_time < 10:  # 5 second buffer
+                time.sleep(1)
+                if timer % 5 == 0:
+                    print("Current time: ", timer, "seconds")
+                timer += 1
+                transcript = transcriber.get_transcription()
             
             # Stop recording and get the output file
-            output_file = recorder.stop_recording()
+            output_file = transcriber.stop_recording()
             
-            if output_file:
+            if output_file or 1==1:
                 # Get the final transcription
-                final_transcript = recorder.get_transcription()
+                final_transcript = transcriber.get_transcription()
                 print(f"\nAudio successfully recorded and saved to: {output_file}\n\n")
-                print(f"Final Transcription: {final_transcript}")
+                print(f"Final Transcription:")
+                print(final_transcript)
                 
                 # Only analyze if we have a transcript
                 if final_transcript and len(final_transcript.strip()) > 0:
                     print("\nAnalyzing transcript...")
-                    feedback = analyze_transcript(final_transcript, 'behavioral')
+                    feedback = analyze_transcript(final_transcript, transcriber.interview_type)
                     if feedback:
                         print("\nTranscript Analysis:")
                         print(feedback)
@@ -664,9 +663,10 @@ def main():
         
     except KeyboardInterrupt:
         print("\nRecording interrupted by user")
-        recorder.stop_recording()
+        transcriber.stop_recording()
     finally:
-        print("Done!")
+        print("Done! \n Now getting the API evaluation...")
+        print("\nAPI evaluation complete.")
 
 if __name__ == "__main__":
     main()
