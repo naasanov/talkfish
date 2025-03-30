@@ -5,11 +5,38 @@ import numpy as np
 from scipy.io import wavfile
 from pydub import AudioSegment
 from .nlp_analysis import analyze_transcript
+from .transcription_service import TranscriptionService
+from typing import Union, BinaryIO
 
-def process_audio(audio_file, interview_type='behavioral'):
+# Global transcription service instance
+transcription_service = TranscriptionService()
+transcription_service.start()
+
+def process_streaming_audio(audio_data: np.ndarray, channel: str = 'mic'):
+    """
+    Process streaming audio data in real-time.
+    
+    Args:
+        audio_data: numpy array of audio samples (should be float32)
+        channel: 'mic' for microphone or 'tab' for tab audio
+    
+    Returns:
+        str: Current transcription for the specified channel
+    """
+    transcription_service.add_audio_data(audio_data.astype(np.float32), channel)
+    return transcription_service.get_transcription(channel)
+
+def process_audio(audio_file: Union[str, BinaryIO], interview_type='behavioral'):
     """
     Process the audio file to extract speech from both interviewer and interviewee
     and generate feedback.
+    
+    Args:
+        audio_file: Path to audio file or file-like object
+        interview_type: Type of interview for analysis
+    
+    Returns:
+        dict: Feedback based on the interview analysis
     """
     # Create a temporary file to store the audio
     temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.wav')
@@ -21,18 +48,21 @@ def process_audio(audio_file, interview_type='behavioral'):
         print(f"Temporary file: {temp_filename}")
         
         # Save the uploaded file to the temporary location
-        audio_file.save(temp_filename)
-        print(f"Saved uploaded file to temporary location")
-        
-        # Convert audio to WAV if needed
-        if not temp_filename.endswith('.wav'):
-            print(f"Converting audio to WAV format")
-            webm_audio = AudioSegment.from_file(temp_filename)
-            temp_filename_wav = temp_filename.replace('.webm', '.wav')
-            webm_audio.export(temp_filename_wav, format="wav")
-            os.remove(temp_filename)
-            temp_filename = temp_filename_wav
-            print(f"Converted to WAV: {temp_filename}")
+        if isinstance(audio_file, str):
+            if os.path.exists(audio_file):
+                if audio_file.endswith('.wav'):
+                    temp_filename = audio_file
+                else:
+                    audio = AudioSegment.from_file(audio_file)
+                    audio.export(temp_filename, format="wav")
+        else:
+            audio_file.save(temp_filename)
+            if not temp_filename.endswith('.wav'):
+                webm_audio = AudioSegment.from_file(temp_filename)
+                temp_filename_wav = temp_filename.replace('.webm', '.wav')
+                webm_audio.export(temp_filename_wav, format="wav")
+                os.remove(temp_filename)
+                temp_filename = temp_filename_wav
         
         # Split stereo channels (left: interviewee mic, right: interviewer from tab)
         sample_rate, audio_data = wavfile.read(temp_filename)
@@ -45,28 +75,13 @@ def process_audio(audio_file, interview_type='behavioral'):
             interviewee_audio = audio_data[:, 0]  # Left channel (microphone)
             interviewer_audio = audio_data[:, 1]  # Right channel (tab audio)
             
-            # Create temporary files for each channel
-            interviewee_temp = tempfile.NamedTemporaryFile(delete=False, suffix='.wav')
-            interviewer_temp = tempfile.NamedTemporaryFile(delete=False, suffix='.wav')
+            # Add audio data to transcription service
+            transcription_service.add_audio_data(interviewee_audio.astype(np.float32), 'mic')
+            transcription_service.add_audio_data(interviewer_audio.astype(np.float32), 'tab')
             
-            # Save separate audio files
-            wavfile.write(interviewee_temp.name, sample_rate, interviewee_audio)
-            wavfile.write(interviewer_temp.name, sample_rate, interviewer_audio)
-            
-            interviewee_temp.close()
-            interviewer_temp.close()
-            
-            print(f"Split channels - Interviewee: {interviewee_temp.name}, Interviewer: {interviewer_temp.name}")
-            
-            # Transcribe both channels
-            print("Transcribing interviewee audio...")
-            interviewee_transcript = transcribe_audio(interviewee_temp.name)
-            print("Transcribing interviewer audio...")
-            interviewer_transcript = transcribe_audio(interviewer_temp.name)
-            
-            # Clean up temp files
-            os.remove(interviewee_temp.name)
-            os.remove(interviewer_temp.name)
+            # Get transcripts from both channels
+            interviewee_transcript = transcription_service.get_transcription('mic')
+            interviewer_transcript = transcription_service.get_transcription('tab')
             
             # Analyze the combined conversation context
             print(f"Analyzing with transcript lengths - Interviewer: {len(interviewer_transcript)} chars, Interviewee: {len(interviewee_transcript)} chars")
@@ -83,7 +98,8 @@ def process_audio(audio_file, interview_type='behavioral'):
             return feedback
         else:
             print("Processing mono audio (single channel)")
-            transcript = transcribe_audio(temp_filename)
+            transcription_service.add_audio_data(audio_data.astype(np.float32), 'mic')
+            transcript = transcription_service.get_transcription('mic')
             print(f"Transcript length: {len(transcript)} chars")
             print(f"Transcript content: '{transcript[:100]}...'")
             
@@ -97,32 +113,21 @@ def process_audio(audio_file, interview_type='behavioral'):
             return feedback
             
     finally:
-        # Clean up the temporary file
-        if os.path.exists(temp_filename):
+        # Clean up the temporary file if it was created
+        if temp_filename != audio_file and os.path.exists(temp_filename):
             os.remove(temp_filename)
 
-def transcribe_audio(audio_file_path):
+def get_current_transcription(channel: str = None) -> str:
     """
-    Transcribe audio file to text using Google Speech Recognition
-    """
-    recognizer = sr.Recognizer()
+    Get the current transcription from the transcription service.
     
-    try:
-        with sr.AudioFile(audio_file_path) as source:
-            # Adjust for ambient noise
-            recognizer.adjust_for_ambient_noise(source)
-            # Record audio data
-            audio_data = recognizer.record(source)
-        
-        # Convert speech to text
-        transcript = recognizer.recognize_google(audio_data)
-        return transcript
-        
-    except sr.UnknownValueError:
-        return ""
-    except sr.RequestError as e:
-        print(f"Speech recognition service error: {e}")
-        return ""
+    Args:
+        channel: Optional channel to get transcription from ('mic', 'tab', or None for both)
+    
+    Returns:
+        str: Current transcription(s)
+    """
+    return transcription_service.get_transcription(channel)
 
 def analyze_interview_conversation(interviewer_text, interviewee_text, interview_type='behavioral'):
     """
