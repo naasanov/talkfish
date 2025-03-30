@@ -44,6 +44,9 @@ def process_audio(audio_file: Union[str, BinaryIO], interview_type='behavioral')
     temp_file.close()
     
     try:
+        print(f"\nProcessing audio file: {audio_file.filename}")
+        print(f"Temporary file: {temp_filename}")
+        
         # Save the uploaded file to the temporary location
         if isinstance(audio_file, str):
             if os.path.exists(audio_file):
@@ -63,9 +66,12 @@ def process_audio(audio_file: Union[str, BinaryIO], interview_type='behavioral')
         
         # Split stereo channels (left: interviewee mic, right: interviewer from tab)
         sample_rate, audio_data = wavfile.read(temp_filename)
+        print(f"Audio sample rate: {sample_rate} Hz")
+        print(f"Audio data shape: {audio_data.shape}")
         
         # Check if audio is stereo (2 channels)
         if len(audio_data.shape) == 2 and audio_data.shape[1] == 2:
+            print("Processing stereo audio (2 channels)")
             interviewee_audio = audio_data[:, 0]  # Left channel (microphone)
             interviewer_audio = audio_data[:, 1]  # Right channel (tab audio)
             
@@ -78,6 +84,11 @@ def process_audio(audio_file: Union[str, BinaryIO], interview_type='behavioral')
             interviewer_transcript = transcription_service.get_transcription('tab')
             
             # Analyze the combined conversation context
+            print(f"Analyzing with transcript lengths - Interviewer: {len(interviewer_transcript)} chars, Interviewee: {len(interviewee_transcript)} chars")
+            if not interviewee_transcript.strip():
+                print("WARNING: Interviewee transcript is empty!")
+                interviewee_transcript = "This is a placeholder text for analysis since the transcription was empty. Please speak more clearly or check your microphone."
+            
             feedback = analyze_interview_conversation(
                 interviewer_transcript, 
                 interviewee_transcript, 
@@ -86,10 +97,19 @@ def process_audio(audio_file: Union[str, BinaryIO], interview_type='behavioral')
             
             return feedback
         else:
-            # If not stereo, process as a single channel
+            print("Processing mono audio (single channel)")
             transcription_service.add_audio_data(audio_data.astype(np.float32), 'mic')
             transcript = transcription_service.get_transcription('mic')
+            print(f"Transcript length: {len(transcript)} chars")
+            print(f"Transcript content: '{transcript[:100]}...'")
+            
+            if not transcript.strip():
+                print("WARNING: Transcript is empty!")
+                transcript = "This is a placeholder text for analysis since the transcription was empty. Please speak more clearly or check your microphone."
+            
+            print("Calling analyze_transcript function...")
             feedback = analyze_transcript(transcript, interview_type)
+            print(f"Feedback received from analyze_transcript. Type: {type(feedback)}")
             return feedback
             
     finally:
@@ -115,23 +135,33 @@ def analyze_interview_conversation(interviewer_text, interviewee_text, interview
     """
     from .nlp_analysis import analyze_transcript
     
+    print("\nIn analyze_interview_conversation function")
+    print(f"Interviewer text length: {len(interviewer_text)} chars")
+    print(f"Interviewee text length: {len(interviewee_text)} chars")
+    
     # If we couldn't capture interviewer audio clearly
     if not interviewer_text:
+        print("No interviewer text, analyzing just interviewee response")
         return analyze_transcript(interviewee_text, interview_type)
     
     # Process the full conversation context
     full_context = f"Interviewer: {interviewer_text}\n\nInterviewee: {interviewee_text}"
+    print(f"Created full context with length: {len(full_context)} chars")
     
     # Extract the interview question type from interviewer text
     question_type = detect_question_type(interviewer_text)
+    print(f"Detected question type: {question_type}")
     
     # Analyze interviewee response with full context
-    return analyze_transcript(
+    print("Calling analyze_transcript with full context...")
+    result = analyze_transcript(
         interviewee_text, 
         interview_type, 
         context=full_context,
         question_type=question_type
     )
+    print(f"Result received from analyze_transcript. Type: {type(result)}")
+    return result
 
 def detect_question_type(interviewer_text):
     """

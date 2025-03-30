@@ -3,15 +3,19 @@ import numpy as np
 import time
 import threading
 from typing import Optional
-import sys
 import os
+import sys
 
-# Add the parent directory to Python path for imports
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# Add the backend directory to Python path for imports
+backend_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if backend_dir not in sys.path:
+    sys.path.insert(0, backend_dir)
+
 from app.transcription_service import TranscriptionService
+from app.nlp_analysis import analyze_transcript
 
 class MicrophoneTranscriber:
-    def __init__(self, chunk_size: int = 1024, sample_rate: int = 16000):
+    def __init__(self, chunk_size: int = 1024, sample_rate: int = 16000, interview_type: str = 'behavioral'):
         """
         Initialize the microphone transcriber.
         
@@ -23,12 +27,13 @@ class MicrophoneTranscriber:
         self.sample_rate = sample_rate
         self.format = pyaudio.paFloat32
         self.channels = 1
+        self.interview_type = interview_type
         
         # Initialize PyAudio
         self.audio = pyaudio.PyAudio()
         
         # Initialize transcription service
-        self.transcription_service = TranscriptionService(interval=0.5)  # Process every 0.5 seconds
+        self.transcription_service = TranscriptionService()
         self.transcription_service.start()
         
         # Recording control
@@ -79,24 +84,30 @@ class MicrophoneTranscriber:
             stream.stop_stream()
             stream.close()
 
-if __name__ == "__main__":
+def main():
     print("Initializing microphone transcriber...")
     transcriber = MicrophoneTranscriber()
     
     try:
-        print("Starting recording. Will record for 10 seconds...")
+        print("Starting recording. Will record for 30 seconds...")
         transcriber.start_recording()
         
-        # Record for 10 seconds while showing intermediate transcriptions
+        # Record for 30 seconds while showing intermediate transcriptions
         start_time = time.time()
-        while time.time() - start_time < 10:
-            time.sleep(0.5)  # Check every 0.5 seconds
+        timer = 0
+        print("Recording started...\n\n")
+        while time.time() - start_time < 5: 
+            time.sleep(1)  # Check every 1 seconds
+            if timer % 5 == 0:
+                print("Current time: ", timer, "seconds")
+            timer += 1
             transcript = transcriber.get_transcription()
-            if transcript:  # Only print if there's actual transcription
-                print("\rCurrent transcription:", transcript, end="", flush=True)
+
+            # if transcript:  # Only print if there's actual transcription
+            #     print("\rCurrent transcription:", transcript, end="", flush=True)
         
         # Stop recording and get final transcription
-        print("\n\nStopping recording...")
+        # print("\n\nStopping recording...")
         transcriber.stop_recording()
         
         # Get and print final transcription
@@ -108,4 +119,9 @@ if __name__ == "__main__":
         print("\nRecording interrupted by user")
     finally:
         # Clean up
-        print("Done!")
+        print("Done! \n Now getting the API evaluation...")
+        analyze_transcript(final_transcript, transcriber.interview_type)
+        print("\nAPI evaluation complete.")
+
+if __name__ == "__main__":
+    main()
