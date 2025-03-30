@@ -371,9 +371,7 @@ class BlackHoleRecorder:
 
     def stop_recording(self):
         """Stop recording from BlackHole."""
-        if not self.is_recording:
-            print("Not currently recording!")
-            return None
+
         
         self.is_recording = False
         if self.recording_thread:
@@ -383,6 +381,7 @@ class BlackHoleRecorder:
         self.transcription_service.stop()
         
         # Save the recorded audio to a WAV file
+        print("\nSaving audio file...")
         output_file = self._save_wav_file()
         
         # Restore original audio routing
@@ -570,10 +569,10 @@ class BlackHoleRecorder:
             
         # 2. Apply soft compression to prevent clipping
         # This reduces the dynamic range before applying gain
-        compressed = np.sign(normalized) * (1 - np.exp(-3 * np.abs(normalized)))
+        compressed = np.sign(normalized) * (1 - np.exp(-1 * np.abs(normalized)))
         
         # 3. Apply gain factor (logarithmic scale)
-        amplified = compressed * gain_factor
+        amplified = compressed * 0.5 #gain_factor
         
         # 4. Clip to prevent distortion (-1.0 to 1.0 for float32 audio)
         amplified = np.clip(amplified, -1.0, 1.0)
