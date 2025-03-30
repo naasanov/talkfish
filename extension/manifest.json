@@ -7,7 +7,8 @@
     "storage",
     "activeTab",
     "tabCapture",
-    "scripting"
+    "scripting",
+    "tabs"
   ],
   "host_permissions": [
     "<all_urls>"
@@ -21,7 +22,8 @@
       "16": "icon.png",
       "48": "icon.png",
       "128": "icon.png"
-    }
+    },
+    "default_popup": "src/popup/popup.html"
   },
   "content_scripts": [
     {
