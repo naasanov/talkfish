@@ -4,8 +4,6 @@ class AudioCapture {
     constructor() {
       this.audioContext = null;
       this.microphoneStream = null;
-      this.tabAudioStream = null;
-      this.mixedStream = null;
       this.mediaRecorder = null;
       this.audioChunks = [];
       this.isRecording = false;
@@ -36,41 +34,17 @@ class AudioCapture {
         // Reset audio chunks
         this.audioChunks = [];
   
-        // 1. Get microphone stream (interviewee)
+        // Get microphone stream (interviewee)
         const micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
         this.microphoneStream = this.audioContext.createMediaStreamSource(micStream);
         console.log("Microphone stream initialized");
   
-        // 2. Get tab audio stream (interviewer) using chrome.tabCapture
-        await new Promise((resolve, reject) => {
-          chrome.tabCapture.capture({ audio: true, video: false }, (tabStream) => {
-            if (chrome.runtime.lastError) {
-              reject(new Error(chrome.runtime.lastError.message));
-              return;
-            }
-            
-            if (tabStream) {
-              this.tabAudioStream = this.audioContext.createMediaStreamSource(tabStream);
-              console.log("Tab audio stream initialized");
-              resolve();
-            } else {
-              reject(new Error("Failed to capture tab audio"));
-            }
-          });
-        });
-  
-        // 3. Mix both audio streams
-        const merger = this.audioContext.createChannelMerger(2);
-        this.microphoneStream.connect(merger, 0, 0); // Microphone to left channel
-        this.tabAudioStream.connect(merger, 0, 1);  // Tab audio to right channel
-  
-        // Create a destination for the merged stream
+        // Create a destination for the microphone stream
         const destination = this.audioContext.createMediaStreamDestination();
-        merger.connect(destination);
-        this.mixedStream = destination.stream;
+        this.microphoneStream.connect(destination);
   
-        // 4. Start recording the mixed stream
-        this.mediaRecorder = new MediaRecorder(this.mixedStream);
+        // Start recording the microphone stream
+        this.mediaRecorder = new MediaRecorder(destination.stream);
         
         this.mediaRecorder.ondataavailable = (event) => {
           if (event.data.size > 0) {
@@ -114,10 +88,7 @@ class AudioCapture {
   
       // Create a blob from the audio chunks
       const audioBlob = new Blob(this.audioChunks, { type: 'audio/webm; codecs=opus' });
-      console.log(audioBlob)
-      // Send to server for processing
-      // const serverCommunication = new ServerCommunication();
-      // await serverCommunication.sendAudioForProcessing(audioBlob);
+      console.log(audioBlob);
       
       this.cleanup();
     }
@@ -129,15 +100,10 @@ class AudioCapture {
         this.microphoneStream = null;
       }
       
-      if (this.tabAudioStream) {
-        this.tabAudioStream.mediaStream.getTracks().forEach(track => track.stop());
-        this.tabAudioStream = null;
-      }
-      
       this.audioChunks = [];
       this.mediaRecorder = null;
-      this.mixedStream = null;
     }
   }
   
   // Export for use in other modules
+  module.exports = AudioCapture;

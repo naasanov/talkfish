@@ -1,10 +1,28 @@
-let isRecording = false
+let isRecording = false;
+let serverCommLoaded = false;
+
+// Load server communication script immediately
+function loadServerCommunication() {
+  const script = document.createElement('script');
+  script.src = chrome.runtime.getURL('src/scripts/serverCommunication.js');
+  script.onload = function() {
+    console.log('Server communication script loaded successfully');
+    serverCommLoaded = true;
+  };
+  script.onerror = function(error) {
+    console.error('Failed to load server communication script:', error);
+  };
+  (document.head || document.documentElement).appendChild(script);
+}
+
+// Load the script right away
+loadServerCommunication();
 
 // Global function to show the modal
 window.showModal = async function () {
   const modal = document.createElement('div');
 
-  let html = null
+  let html = null;
   try {
     const response = await fetch(chrome.runtime.getURL('src/resources/overlay.html'));
     if (!response.ok) {
@@ -16,14 +34,15 @@ window.showModal = async function () {
     modal.textContent = 'Failed to load overlay.';
     document.body.appendChild(modal);
     modal.style.display = 'block';
+    return;
   }
 
   if (!html) {
-    throw new Error("Modal html retrieval failed")
+    throw new Error("Modal html retrieval failed");
   }
 
   // Modal content
-  modal.innerHTML = html
+  modal.innerHTML = html;
 
   const logoImg = modal.querySelector('.logo');
   if (logoImg) {
@@ -36,69 +55,38 @@ window.showModal = async function () {
   // Show the modal
   modal.style.display = 'block';
 
+  // Setup the toggle button
+  const button = document.getElementById('toggle');
+  if (!button) {
+    console.error('Toggle button not found in overlay');
+    return;
+  }
 
-  // function stopStreamOnServer() {
-  //   fetch('http://localhost:5000/stop-stream', {
-  //     method: 'POST',
-  //   })
-  //     .then(response => response.text())
-  //     .then(data => {
-  //       console.log(data);  // "Stream will stop"
-  //     })
-  //     .catch(error => {
-  //       console.error("Error stopping the stream:", error);
-  //     });
-  // }
-
-  let eventSource = null
-
-  // Example of running a script from the modal
-  document.getElementById('toggle').addEventListener('click', function () {
-    console.log('toggle clicked')
+  button.addEventListener('click', function () {
+    console.log('toggle clicked');
     isRecording = !isRecording;
-    const button = document.getElementById('toggle');
+    
     if (isRecording) {
-      // const eventSource = new EventSource('http://localhost:5000/start-stream');
-      // eventSource.onmessage = (event) => {
-        // const data = JSON.parse(event.data); //In JSON, right?
-        // const cardType = data.type; //question, answer, tip
-        // const cardContent = data.content; // card content
-
-        function createCard(type, content) {
-          console.log('createCard called')
-          const cardContainer = document.querySelector('.card-container');
-          if (!cardContainer) {
-            console.error('Card container not found');
-            return;
-          }
-
-          const card = document.createElement('div');
-          card.className = 'card ${type}';
-
-          const title = document.createElement('h3');
-          title.textContent = type.charAt(0).toUpperCase() + type.slice(1); // Capitalize type
-          card.appendChild(title);
-
-          const paragraph = document.createElement('p');
-          paragraph.textContent = content;
-          card.appendChild(paragraph);
-
-          cardContainer.appendChild(card);
-        }
-
-        // Call the function to create the card
-        createCard('question', 'how many fingers do I have?');
-        createCard('answer', '10');
-        createCard('tip', 'Im storking it.');
-        console.log('cards created')
-      //}
+      // Check if server communication is loaded
+      if (window.serverCommunication && serverCommLoaded) {
+        window.serverCommunication.startMicRecording();
+      } else {
+        console.error('Server communication not initialized');
+        isRecording = false;
+        alert('Speech analysis is not ready yet. Please try again in a moment.');
+        return;
+      }
+      
       button.classList.add('recording');
       button.textContent = '⏸';
     } else {
-      // if (eventSource) {
-      //   eventSource.close()
-      // }
-      // stopStreamOnServer()
+      // Stop recording
+      if (window.serverCommunication && serverCommLoaded) {
+        window.serverCommunication.stopMicRecording();
+      } else {
+        console.error('Server communication not initialized');
+      }
+      
       button.classList.remove('recording');
       button.textContent = '▶';
     }

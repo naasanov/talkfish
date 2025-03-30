@@ -102,12 +102,7 @@ def main():
                 print("Current time: ", timer, "seconds")
             timer += 1
             transcript = transcriber.get_transcription()
-
-            # if transcript:  # Only print if there's actual transcription
-            #     print("\rCurrent transcription:", transcript, end="", flush=True)
         
-        # Stop recording and get final transcription
-        # print("\n\nStopping recording...")
         transcriber.stop_recording()
         
         # Get and print final transcription

@@ -6,12 +6,12 @@
   "permissions": [
     "storage",
     "activeTab",
-    "tabCapture",
     "scripting",
     "tabs"
   ],
   "host_permissions": [
-    "<all_urls>"
+    "<all_urls>",
+    "http://localhost:5002/*"
   ],
   "background": {
     "service_worker": "src/background.js",

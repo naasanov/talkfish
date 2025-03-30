@@ -1,15 +1,22 @@
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, Response
 from werkzeug.utils import secure_filename
 import os
 import numpy as np
+import time
+import json
+import threading
 from .audio_processing import process_audio
-from .tab_transcribe import TabTranscriber
+from .mic_transcribe import MicrophoneTranscriber
+from .nlp_analysis import analyze_transcript
 
 # Create blueprint
 bp = Blueprint('main', __name__)
 
-# Global transcriber instance
-tab_transcriber = None
+# Global transcriber instance for microphone
+mic_transcriber = None
+mic_recording = False
+current_transcript = ""
+transcript_lock = threading.Lock()
 
 # Configure upload settings
 ALLOWED_EXTENSIONS = {'wav', 'webm', 'mp3'}
@@ -25,104 +32,123 @@ def health_check():
         'message': 'Service is running'
     }), 200
 
-@bp.route('/start-tab-recording', methods=['POST'])
-def start_tab_recording():
-    """Start recording tab audio"""
-    global tab_transcriber
+@bp.route('/start-mic-recording', methods=['POST'])
+def start_mic_recording():
+    """Start recording microphone audio"""
+    global mic_transcriber, mic_recording
     
     try:
         interview_type = request.json.get('interview_type', 'behavioral')
         
         # Create new transcriber if needed
-        if tab_transcriber is None:
-            tab_transcriber = TabTranscriber(interview_type=interview_type)
+        if mic_transcriber is None:
+            mic_transcriber = MicrophoneTranscriber(interview_type=interview_type)
         
-        tab_transcriber.start_recording()
+        mic_transcriber.start_recording()
+        mic_recording = True
+        
+        # Start background thread to update transcript
+        threading.Thread(target=update_transcript_periodically, daemon=True).start()
         
         return jsonify({
             'status': 'success',
-            'message': 'Tab recording started'
+            'message': 'Microphone recording started'
         }), 200
         
     except Exception as e:
         return jsonify({
-            'error': f'Error starting tab recording: {str(e)}'
+            'error': f'Error starting microphone recording: {str(e)}'
         }), 500
 
-@bp.route('/stop-tab-recording', methods=['POST'])
-def stop_tab_recording():
-    """Stop recording tab audio and return final transcript"""
-    global tab_transcriber
+@bp.route('/stop-mic-recording', methods=['POST'])
+def stop_mic_recording():
+    """Stop recording microphone audio"""
+    global mic_transcriber, mic_recording
     
     try:
-        if tab_transcriber is None:
+        if mic_transcriber is None:
             return jsonify({
-                'error': 'No active tab recording'
+                'error': 'No active microphone recording'
             }), 400
         
         # Stop recording and get final transcript
-        tab_transcriber.stop_recording()
-        final_transcript = tab_transcriber.get_transcription()
-        
-        # Analyze the transcript
-        feedback = tab_transcriber.analyze_transcript(final_transcript)
+        mic_transcriber.stop_recording()
+        final_transcript = mic_transcriber.get_transcription()
+        mic_recording = False
         
         # Clean up
-        tab_transcriber = None
+        mic_transcriber = None
         
         return jsonify({
             'status': 'success',
-            'transcript': final_transcript,
+            'transcript': final_transcript
+        }), 200
+        
+    except Exception as e:
+        return jsonify({
+            'error': f'Error stopping microphone recording: {str(e)}'
+        }), 500
+
+@bp.route('/get-mic-feedback', methods=['GET'])
+def get_mic_feedback():
+    """Get the latest microphone transcript and analysis"""
+    global mic_transcriber, current_transcript
+    
+    try:
+        if mic_transcriber is None:
+            return jsonify({
+                'error': 'No active microphone recording'
+            }), 400
+        
+        with transcript_lock:
+            transcript = current_transcript
+        
+        if not transcript:
+            return jsonify({
+                'status': 'success',
+                'message': 'No transcript available yet',
+                'feedback': {
+                    'message': 'Start speaking to get feedback',
+                    'type': 'neutral',
+                    'details': {
+                        'suggestion': 'Speak clearly into your microphone'
+                    }
+                }
+            }), 200
+        
+        # Analyze the transcript
+        feedback = analyze_transcript(transcript)
+        
+        return jsonify({
+            'status': 'success',
+            'transcript': transcript,
             'feedback': feedback
         }), 200
         
     except Exception as e:
         return jsonify({
-            'error': f'Error stopping tab recording: {str(e)}'
+            'error': f'Error getting microphone feedback: {str(e)}'
         }), 500
 
-@bp.route('/stream-tab-audio', methods=['POST'])
-def stream_tab_audio():
-    """Stream audio data from the tab"""
-    global tab_transcriber
+def update_transcript_periodically():
+    """Update the current transcript periodically"""
+    global mic_transcriber, current_transcript, mic_recording
     
-    try:
-        if tab_transcriber is None:
-            return jsonify({
-                'error': 'No active tab recording'
-            }), 400
-        
-        # Get audio data from request
-        if not request.is_json:
-            return jsonify({
-                'error': 'Request must be JSON'
-            }), 400
-        
-        # Extract audio data from request
-        audio_data = request.json.get('audio_data')
-        if not audio_data:
-            return jsonify({
-                'error': 'No audio data provided'
-            }), 400
-        
-        # Convert audio data to numpy array
-        audio_array = np.array(audio_data, dtype=np.float32)
-        
-        # Add to transcriber
-        tab_transcriber.add_audio_data(audio_array)
-        
-        # Get current transcription
-        current_transcript = tab_transcriber.get_transcription()
-        
-        return jsonify({
-            'status': 'success',
-            'transcript': current_transcript
-        }), 200
-        
-    except Exception as e:
-        return jsonify({
-            'error': f'Error processing tab audio: {str(e)}'
-        }), 500
+    while mic_recording and mic_transcriber is not None:
+        try:
+            # Get current transcription
+            transcript = mic_transcriber.get_transcription()
+            
+            # Update the shared transcript
+            with transcript_lock:
+                current_transcript = transcript
+            
+            # Sleep for a short time
+            time.sleep(1)
+            
+        except Exception as e:
+            print(f"Error updating transcript: {e}")
+            time.sleep(1)
 
 @bp.route('/analyze', methods=['POST'])
 def analyze_interview():
