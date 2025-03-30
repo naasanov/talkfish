@@ -17,7 +17,7 @@ class VirtualInputDevice:
         self.CHUNK = 1024
         self.FORMAT = pyaudio.paFloat32
         self.CHANNELS = 1  # Mono input
-        self.RATE = 44100
+        self.RATE = 12000
         self.source_device = None  # The real device with 2 output channels
         self.stream = None
         self.audio_data = []
@@ -57,7 +57,7 @@ class VirtualInputDevice:
         self.stream = self.p.open(
             format=self.FORMAT,
             channels=self.CHANNELS,
-            rate=self.RATE,
+            rate=16000,
             input=True,
             frames_per_buffer=self.CHUNK,
             stream_callback=self.audio_callback
